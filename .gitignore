@@ -84,3 +84,8 @@ outputs/
 temp/
 tmp/
 *.wav.tmp
+
+# Large Audio Datasets & Archives
+musdb18hq/
+dataset/synthetic/
+*.zip
