@@ -39,6 +39,7 @@ def main():
     parser.add_argument("--wet", type=str, default=None, help="Path to target wet audio (optional)")
     parser.add_argument("--metadata", type=str, default="dataset/synthetic/val/metadata.jsonl", help="Validation metadata path")
     parser.add_argument("--output", type=str, default="audio/reconstructed_pred.wav", help="Output audio path")
+    parser.add_argument("--threshold", type=float, default=0.5, help="Detection threshold probability (default: 0.5)")
     parser.add_argument("--device", type=str, default="cpu", help="Device (cpu/cuda/mps)")
     args = parser.parse_args()
 
@@ -97,8 +98,8 @@ def main():
     # -------------------------------------------------------------
     # Step 1: Predict Chain using Neural Network
     # -------------------------------------------------------------
-    print("[1] Running Neural Network Inference...")
-    pred_chain = model.predict_chain(dry_audio, target_wet, threshold=0.5)
+    print(f"[1] Running Neural Network Inference (Threshold: {args.threshold})...")
+    pred_chain = model.predict_chain(dry_audio, target_wet, threshold=args.threshold)
 
     print("    Predicted Chain Structure:")
     for step in pred_chain["chain"]:
