@@ -1,0 +1,69 @@
+{
+  "execution_mode": "real",
+  "requested_mode": "real",
+  "simulated": false,
+  "warm_started": true,
+  "dry_input": "Testing/test1_dry.wav",
+  "wet_reference": "Testing/test1_wet.wav",
+  "output_audio": "results/testing_pair/warm.wav",
+  "dry_loss": 4.009283,
+  "predictor_loss": 4.009012,
+  "start_loss": 4.009012,
+  "baseline": "predictor",
+  "final_loss": 4.009012,
+  "improvement_vs_start_pct": 0.0,
+  "improvement_vs_dry_pct": 0.0068,
+  "cumulative_reward": 0.0,
+  "total_steps": 1,
+  "stop_reason": "STOP action chosen",
+  "chain": [
+    {
+      "effect": "Delay",
+      "parameters": {
+        "delay_time": 0.48355546593666077,
+        "feedback": 0.48681697249412537,
+        "wet_mix": 0.7853823900222778,
+        "dry_mix": 0.16741187870502472
+      }
+    },
+    {
+      "effect": "Distortion",
+      "parameters": {
+        "drive": 0.34298673272132874,
+        "tone": 0.5152983069419861,
+        "mix": 0.5457741618156433,
+        "output_gain": 0.6131341457366943
+      }
+    }
+  ],
+  "verification": {
+    "rerender_max_abs_diff": 0.0,
+    "rerender_loss": 4.009012,
+    "reported_loss": 4.009012,
+    "chain_matches_audio": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "STOP",
+      "prev_loss": 4.009012,
+      "current_loss": 4.009012,
+      "step_reward": 0.0,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.0,
+        "step_penalty": 0.0,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.0,
+        "prev_loss": 4.009012,
+        "current_loss": 4.009012,
+        "delta_loss": 0.0,
+        "target_achieved": false
+      },
+      "parameters": [],
+      "terminated": true,
+      "truncated": false
+    }
+  ],
+  "runtime_sec": 0.652
+}

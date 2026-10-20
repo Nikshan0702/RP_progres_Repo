@@ -1,0 +1,130 @@
+{
+  "execution_mode": "real",
+  "requested_mode": "real",
+  "simulated": false,
+  "warm_started": false,
+  "dry_input": "Testing/test1_dry.wav",
+  "wet_reference": "Testing/test1_wet.wav",
+  "output_audio": "results/testing_pair/cold.wav",
+  "dry_loss": 4.009283,
+  "predictor_loss": null,
+  "start_loss": 4.009283,
+  "baseline": "dry",
+  "final_loss": 3.805149,
+  "improvement_vs_start_pct": 5.0915,
+  "improvement_vs_dry_pct": 5.0915,
+  "cumulative_reward": 1.971335,
+  "total_steps": 2,
+  "stop_reason": "STOP action chosen",
+  "chain": [
+    {
+      "effect": "Flanger",
+      "parameters": {
+        "rate": 0.5088440179824829,
+        "depth": 0.31658193469047546,
+        "feedback": 0.38671401143074036,
+        "mix": 0.2959752380847931
+      }
+    }
+  ],
+  "verification": {
+    "rerender_max_abs_diff": 0.0,
+    "rerender_loss": 3.805149,
+    "reported_loss": 3.805149,
+    "chain_matches_audio": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "Flanger",
+      "prev_loss": 4.009283,
+      "current_loss": 3.805149,
+      "step_reward": 1.971335,
+      "reward_breakdown": {
+        "loss_improvement_reward": 2.041335105895996,
+        "step_penalty": -0.05,
+        "length_penalty": -0.02,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 1.971335105895996,
+        "prev_loss": 4.009283,
+        "current_loss": 3.805149,
+        "delta_loss": 0.204134,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "rate",
+          "normalized": 0.5088,
+          "physical": 5.1376,
+          "unit": "Hz",
+          "display": "5.1 Hz",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "depth",
+          "normalized": 0.3166,
+          "physical": 0.3166,
+          "unit": "dimensionless",
+          "display": "0.32",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "feedback",
+          "normalized": 0.3867,
+          "physical": 0.3674,
+          "unit": "dimensionless",
+          "display": "0.37",
+          "min_physical": 0.0,
+          "max_physical": 0.95,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "mix",
+          "normalized": 0.296,
+          "physical": 0.296,
+          "unit": "dimensionless",
+          "display": "0.30",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 2,
+      "action": "STOP",
+      "prev_loss": 3.805149,
+      "current_loss": 3.805149,
+      "step_reward": 0.0,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.0,
+        "step_penalty": 0.0,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.0,
+        "prev_loss": 3.805149,
+        "current_loss": 3.805149,
+        "delta_loss": 0.0,
+        "target_achieved": false
+      },
+      "parameters": [],
+      "terminated": true,
+      "truncated": false
+    }
+  ],
+  "runtime_sec": 0.467
+}

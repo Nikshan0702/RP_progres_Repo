@@ -29,6 +29,7 @@ import torch
 from dapn.dapn import DAPN
 from dataset.dapn_dataset import PARAM_SCHEMA, SUPPORTED_EFFECTS
 from common.audio_pair import prepare_audio_pair
+from common.config_loader import get_max_duration_seconds
 from common.checkpoint import describe, load_checkpoint
 from rl.grrl_agent import GRRLAgent
 from rl.grrl_env import BACKTRACK_ACTION_IDX, EFFECT_ACTIONS, GRRLEnv, NUM_EFFECT_ACTIONS, STOP_ACTION_IDX, improvement_percent
@@ -120,6 +121,9 @@ class WorkflowEngine:
         self.deterministic = True
         self.stop_reason: str | None = None
         self.verification: dict[str, Any] | None = None
+        self.full_dry = self.full_wet = None      # whole pair (<= system limit); the RL decision uses only the 2 s crop
+        self.full_length: dict[str, Any] | None = None
+        self.step_audio: list[torch.Tensor] = []   # decision-crop render after step 0 (start), 1, 2, ... (for PNG export)
         self.backend_error: str | None = None
         self.predictor_error: str | None = None
         self.predictor_available = False
@@ -194,6 +198,9 @@ class WorkflowEngine:
         self.predictor_loss = None
         self.stop_reason = None
         self.verification = None
+        self.full_dry = self.full_wet = None
+        self.full_length = None
+        self.step_audio = []
         for st in self.stages.values():
             st.update(status="pending", message="Awaiting execution", timestamp=None, data={})
 
@@ -240,6 +247,9 @@ class WorkflowEngine:
             # One shared contract (common.audio_pair): mono, finite, aligned, cropped to the 2 s RL window.
             self.dry_tensor, self.wet_tensor = prepare_audio_pair(dry_raw, wet_raw, sample_rate=self.sample_rate,
                                                                   duration=DEFAULT_AUDIO_DURATION)
+            # The chain is DECIDED on the 2 s crop above, but the final output renders the WHOLE pair (<= system limit).
+            self.full_dry, self.full_wet = prepare_audio_pair(dry_raw, wet_raw, sample_rate=self.sample_rate,
+                                                              duration=float(get_max_duration_seconds()))
             if mode == "real":
                 self.env.max_episode_steps = max(self.max_steps, self.env.min_chain_length, 1)
                 self.obs, self.info = self.env.reset(self.dry_tensor, self.wet_tensor, use_warm_start=self.warm_started)
@@ -249,7 +259,8 @@ class WorkflowEngine:
                 self.baseline_name = "predictor" if self.warm_started else "dry"
                 self.current_loss = self.start_loss
                 self.current_audio_tensor = self.env.current_audio.clone()   # the predictor's render when warm-started
-                self.dry_tensor, self.wet_tensor = self.env.dry_audio, self.env.target_audio
+                self.step_audio = [self.current_audio_tensor.clone().cpu()]
+                self.dry_tensor, self.wet_tensor = self.full_dry, self.full_wet   # A/B playback at output length
             else:
                 self.dry_loss = self.start_loss = self.current_loss = 7.20   # SIMULATED scripted baseline
                 self.baseline_name = "dry"
@@ -334,6 +345,7 @@ class WorkflowEngine:
         self.obs = next_obs
         self.current_loss = float(step_info["current_loss"])
         self.current_audio_tensor = env.current_audio.clone()
+        self.step_audio.append(self.current_audio_tensor.clone().cpu())
         new_chain = copy.deepcopy(env.current_chain)
         delta = prev_loss - self.current_loss
         impr_start = improvement_percent(self.start_loss, self.current_loss)
@@ -423,24 +435,43 @@ class WorkflowEngine:
 
     # ------------------------------------------------------------------
     def _finalize_output(self, final_chain: list[dict[str, Any]]) -> None:
-        """Stage 11 (real mode): final audio IS env.current_audio; verify it against an independent re-render."""
-        self._set_stage_status("output", "running", "Verifying and encoding final audio...")
+        """Stage 11 (real mode). The chain was chosen on the 2 s crop; render it over the WHOLE pair and verify.
+
+        Verification: (a) the crop render of the reported chain equals the env's audio/loss (what the agent optimised),
+        (b) the served full-length audio is an independent re-render of the reported chain."""
+        self._set_stage_status("output", "running", "Rendering final chain over the full-length pair and verifying...")
         env = self.env
-        self.final_audio_tensor = env.current_audio.clone()
         with torch.no_grad():
-            ref = env.dapn.process(env.dry_audio, {"chain": final_chain}) if final_chain else env.dry_audio.clone()
-            ref_loss = float(env.loss_fn(ref, env.target_audio))
-        diff = float((ref - self.final_audio_tensor).abs().max())
-        self.verification = {"rerender_max_abs_diff": diff, "rerender_loss": _r(ref_loss), "reported_loss": _r(self.current_loss),
-                             "chain_matches_audio": bool(diff < 1e-5 and abs(ref_loss - self.current_loss) < 1e-5)}
+            crop_ref = env.dapn.process(env.dry_audio, {"chain": final_chain}) if final_chain else env.dry_audio.clone()
+            crop_loss = float(env.loss_fn(crop_ref, env.target_audio))
+            full = env.dapn.process(self.full_dry, {"chain": final_chain}) if final_chain else self.full_dry.clone()
+            full_loss = float(env.loss_fn(full, self.full_wet))
+            full_dry_loss = float(env.loss_fn(self.full_dry, self.full_wet))
+            full_again = env.dapn.process(self.full_dry, {"chain": final_chain}) if final_chain else self.full_dry.clone()
+        if not torch.isfinite(full).all():
+            raise WorkflowStepError("Full-length render produced non-finite audio")
+        self.final_audio_tensor = full
+        n = env.current_audio.shape[-1]
+        crop_diff = float((crop_ref - env.current_audio).abs().max())
+        self.verification = {"rerender_max_abs_diff": crop_diff, "rerender_loss": _r(crop_loss), "reported_loss": _r(self.current_loss),
+                             "full_rerender_max_abs_diff": float((full - full_again).abs().max()),
+                             "chain_matches_audio": bool(crop_diff < 1e-5 and abs(crop_loss - self.current_loss) < 1e-5
+                                                         and float((full - full_again).abs().max()) < 1e-5)}
+        self.full_length = {"decision_seconds": round(n / self.sample_rate, 3), "output_seconds": round(full.shape[-1] / self.sample_rate, 3),
+                            "full_dry_loss": _r(full_dry_loss), "full_final_loss": _r(full_loss),
+                            "full_improvement_pct": _r(improvement_percent(full_dry_loss, full_loss), 4),
+                            "note": "chain chosen on the first decision_seconds; output/full losses cover the whole pair"}
         fm = compute_audio_metrics(self.final_audio_tensor, self.sample_rate)
         impr = improvement_percent(self.start_loss, self.current_loss)
         impr_dry = improvement_percent(self.dry_loss, self.current_loss)
         self._set_stage_status("output", "completed",
-                               f"Final audio: {fm['duration_sec']}s, loss {self.current_loss:.4f} ({impr:+.1f}% vs {self.baseline_name}, {impr_dry:+.1f}% vs dry)",
+                               f"Final audio: {fm['duration_sec']}s (chain chosen on first {self.full_length['decision_seconds']}s), "
+                               f"crop loss {self.current_loss:.4f} ({impr:+.1f}% vs {self.baseline_name}, {impr_dry:+.1f}% vs dry); "
+                               f"full-length loss {full_loss:.4f} vs dry {full_dry_loss:.4f}",
                                {"final_metrics": fm, "final_peaks": compute_waveform_peaks(self.final_audio_tensor, 120), "final_chain": final_chain,
                                 "base64_audio": tensor_to_base64_wav(self.final_audio_tensor, self.sample_rate),
-                                "total_improvement_pct": _r(impr, 4), "dry_improvement_pct": _r(impr_dry, 4), "verification": self.verification})
+                                "total_improvement_pct": _r(impr, 4), "dry_improvement_pct": _r(impr_dry, 4),
+                                "verification": self.verification, "full_length": self.full_length})
 
     def run_all(self) -> dict[str, Any]:
         if not self.is_initialized:
@@ -472,7 +503,7 @@ class WorkflowEngine:
             "current_loss": _r(self.current_loss), "final_loss": _r(self.current_loss) if self.is_terminated else None,
             "cumulative_reward": _r(self.cumulative_reward), "improvement_pct": _r(impr, 4), "dry_improvement_pct": _r(impr_dry, 4),
             "improvement_vs_start": _r(self.start_loss - self.current_loss) if have else None,
-            "verification": self.verification, "has_output_audio": self.final_audio_tensor is not None,
+            "verification": self.verification, "full_length": self.full_length, "has_output_audio": self.final_audio_tensor is not None,
             "stages": list(self.stages.values()), "steps_history": self.steps_history, "loss_history": self.loss_history,
             "reward_history": self.reward_history, "current_chain": chain, "supported_effects": list(SUPPORTED_EFFECTS), "all_actions": EFFECT_ACTIONS,
             "checkpoints": self.checkpoint_status(),

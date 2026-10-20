@@ -1,0 +1,88 @@
+{
+  "execution_mode": "real",
+  "requested_mode": "real",
+  "simulated": false,
+  "warm_started": true,
+  "dry_input": "/Users/nikshanps/Desktop/RP-PROJECT/RP-imp/RP2_A/Testing/test1_dry.wav",
+  "wet_reference": "/Users/nikshanps/Desktop/RP-PROJECT/RP-imp/RP2_A/Testing/test1_wet.wav",
+  "output_audio": "results/test1_run.wav",
+  "dry_loss": 4.009283,
+  "predictor_loss": 2.912517,
+  "start_loss": 2.912517,
+  "baseline": "predictor",
+  "final_loss": 2.912517,
+  "improvement_vs_start_pct": 0.0,
+  "improvement_vs_dry_pct": 27.3557,
+  "cumulative_reward": 0.0,
+  "total_steps": 1,
+  "stop_reason": "STOP action chosen",
+  "chain": [
+    {
+      "effect": "Compressor",
+      "parameters": {
+        "threshold": 0.10932329297065735,
+        "ratio": 0.5833865404129028,
+        "attack": 0.5092796087265015,
+        "release": 0.3697805106639862,
+        "makeup_gain": 0.5761141180992126
+      }
+    },
+    {
+      "effect": "Distortion",
+      "parameters": {
+        "drive": 0.6226418018341064,
+        "tone": 0.11432496458292007,
+        "mix": 0.6444278359413147,
+        "output_gain": 0.574733316898346
+      }
+    },
+    {
+      "effect": "Delay",
+      "parameters": {
+        "delay_time": 0.3078967332839966,
+        "feedback": 0.35303592681884766,
+        "wet_mix": 0.6348729729652405,
+        "dry_mix": 0.38246431946754456
+      }
+    }
+  ],
+  "verification": {
+    "rerender_max_abs_diff": 0.0,
+    "rerender_loss": 2.912517,
+    "reported_loss": 2.912517,
+    "full_rerender_max_abs_diff": 0.0,
+    "chain_matches_audio": true
+  },
+  "full_length": {
+    "decision_seconds": 2.0,
+    "output_seconds": 9.01,
+    "full_dry_loss": 3.908667,
+    "full_final_loss": 2.934634,
+    "full_improvement_pct": 24.9198,
+    "note": "chain chosen on the first decision_seconds; output/full losses cover the whole pair"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "STOP",
+      "prev_loss": 2.912517,
+      "current_loss": 2.912517,
+      "step_reward": 0.0,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.0,
+        "step_penalty": 0.0,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.0,
+        "prev_loss": 2.912517,
+        "current_loss": 2.912517,
+        "delta_loss": 0.0,
+        "target_achieved": false
+      },
+      "parameters": [],
+      "terminated": true,
+      "truncated": false
+    }
+  ],
+  "runtime_sec": 1.55
+}

@@ -1,0 +1,766 @@
+{
+  "execution_mode": "real",
+  "requested_mode": "real",
+  "simulated": false,
+  "warm_started": true,
+  "dry_input": "Testing/rl_test_dry.wav",
+  "wet_reference": "Testing/rl_test_wet.wav",
+  "output_audio": "results/rl_test_output.wav",
+  "dry_loss": 1.168531,
+  "predictor_loss": 1.437082,
+  "start_loss": 1.437082,
+  "baseline": "predictor",
+  "final_loss": 3.732634,
+  "improvement_vs_start_pct": -159.737,
+  "improvement_vs_dry_pct": -219.4297,
+  "cumulative_reward": -23.455517,
+  "total_steps": 10,
+  "stop_reason": "time limit (10 operations) - truncated, no STOP",
+  "chain": [
+    {
+      "effect": "Distortion",
+      "parameters": {
+        "drive": 0.24715659022331238,
+        "tone": 0.30882568657398224,
+        "mix": 0.636234238743782,
+        "output_gain": 1.0
+      }
+    },
+    {
+      "effect": "EQ",
+      "parameters": {
+        "frequency": 0.3878822922706604,
+        "gain": 0.4042152166366577,
+        "q": 0.3591182231903076
+      }
+    },
+    {
+      "effect": "Reverb",
+      "parameters": {
+        "room_size": 0.5470738410949707,
+        "damping": 0.46128785610198975,
+        "wet_mix": 0.48242536187171936,
+        "dry_mix": 0.42089250683784485,
+        "decay": 0.4643305540084839
+      }
+    }
+  ],
+  "verification": {
+    "rerender_max_abs_diff": 0.0,
+    "rerender_loss": 3.732634,
+    "reported_loss": 3.732634,
+    "full_rerender_max_abs_diff": 0.0,
+    "chain_matches_audio": true
+  },
+  "full_length": {
+    "decision_seconds": 2.0,
+    "output_seconds": 8.0,
+    "full_dry_loss": 1.183652,
+    "full_final_loss": 3.198295,
+    "full_improvement_pct": -170.2057,
+    "note": "chain chosen on the first decision_seconds; output/full losses cover the whole pair"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "Distortion",
+      "prev_loss": 1.437082,
+      "current_loss": 1.572863,
+      "step_reward": -1.407807,
+      "reward_breakdown": {
+        "loss_improvement_reward": -1.357806921005249,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -1.407806921005249,
+        "prev_loss": 1.437082,
+        "current_loss": 1.572863,
+        "delta_loss": -0.135781,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.3207,
+          "physical": 0.3207,
+          "unit": "dimensionless",
+          "display": "0.32",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3298,
+          "prev_physical": 0.3298,
+          "delta_normalized": -0.0092
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2514,
+          "physical": 0.2514,
+          "unit": "dimensionless",
+          "display": "0.25",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2402,
+          "prev_physical": 0.2402,
+          "delta_normalized": 0.0112
+        },
+        {
+          "name": "mix",
+          "normalized": 0.5769,
+          "physical": 0.5769,
+          "unit": "dimensionless",
+          "display": "0.58",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5911,
+          "prev_physical": 0.5911,
+          "delta_normalized": -0.0143
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.5136,
+          "physical": -2.7546,
+          "unit": "dB",
+          "display": "-2.8 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.4359,
+          "prev_physical": -4.1534,
+          "delta_normalized": 0.0777
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 2,
+      "action": "Distortion",
+      "prev_loss": 1.572863,
+      "current_loss": 1.742993,
+      "step_reward": -1.751303,
+      "reward_breakdown": {
+        "loss_improvement_reward": -1.7013025283813477,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -1.7513025283813477,
+        "prev_loss": 1.572863,
+        "current_loss": 1.742993,
+        "delta_loss": -0.17013,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.3103,
+          "physical": 0.3103,
+          "unit": "dimensionless",
+          "display": "0.31",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3207,
+          "prev_physical": 0.3207,
+          "delta_normalized": -0.0104
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2609,
+          "physical": 0.2609,
+          "unit": "dimensionless",
+          "display": "0.26",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2514,
+          "prev_physical": 0.2514,
+          "delta_normalized": 0.0095
+        },
+        {
+          "name": "mix",
+          "normalized": 0.5738,
+          "physical": 0.5738,
+          "unit": "dimensionless",
+          "display": "0.57",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5769,
+          "prev_physical": 0.5769,
+          "delta_normalized": -0.0031
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.5887,
+          "physical": -1.4038,
+          "unit": "dB",
+          "display": "-1.4 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.5136,
+          "prev_physical": -2.7546,
+          "delta_normalized": 0.075
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 3,
+      "action": "Distortion",
+      "prev_loss": 1.742993,
+      "current_loss": 1.949389,
+      "step_reward": -2.11396,
+      "reward_breakdown": {
+        "loss_improvement_reward": -2.063959836959839,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -2.1139598369598387,
+        "prev_loss": 1.742993,
+        "current_loss": 1.949389,
+        "delta_loss": -0.206396,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.3004,
+          "physical": 0.3004,
+          "unit": "dimensionless",
+          "display": "0.30",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3103,
+          "prev_physical": 0.3103,
+          "delta_normalized": -0.0099
+        },
+        {
+          "name": "tone",
+          "normalized": 0.269,
+          "physical": 0.269,
+          "unit": "dimensionless",
+          "display": "0.27",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2609,
+          "prev_physical": 0.2609,
+          "delta_normalized": 0.0081
+        },
+        {
+          "name": "mix",
+          "normalized": 0.5759,
+          "physical": 0.5759,
+          "unit": "dimensionless",
+          "display": "0.58",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5738,
+          "prev_physical": 0.5738,
+          "delta_normalized": 0.0021
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.6611,
+          "physical": -0.1004,
+          "unit": "dB",
+          "display": "-0.1 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.5887,
+          "prev_physical": -1.4038,
+          "delta_normalized": 0.0724
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 4,
+      "action": "Distortion",
+      "prev_loss": 1.949389,
+      "current_loss": 2.196261,
+      "step_reward": -2.518725,
+      "reward_breakdown": {
+        "loss_improvement_reward": -2.4687254428863525,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -2.5187254428863524,
+        "prev_loss": 1.949389,
+        "current_loss": 2.196261,
+        "delta_loss": -0.246873,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2912,
+          "physical": 0.2912,
+          "unit": "dimensionless",
+          "display": "0.29",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3004,
+          "prev_physical": 0.3004,
+          "delta_normalized": -0.0092
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2762,
+          "physical": 0.2762,
+          "unit": "dimensionless",
+          "display": "0.28",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.269,
+          "prev_physical": 0.269,
+          "delta_normalized": 0.0071
+        },
+        {
+          "name": "mix",
+          "normalized": 0.581,
+          "physical": 0.581,
+          "unit": "dimensionless",
+          "display": "0.58",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5759,
+          "prev_physical": 0.5759,
+          "delta_normalized": 0.0051
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.7316,
+          "physical": 1.1689,
+          "unit": "dB",
+          "display": "+1.2 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.6611,
+          "prev_physical": -0.1004,
+          "delta_normalized": 0.0705
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 5,
+      "action": "Distortion",
+      "prev_loss": 2.196261,
+      "current_loss": 2.48853,
+      "step_reward": -2.972685,
+      "reward_breakdown": {
+        "loss_improvement_reward": -2.922685146331787,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -2.972685146331787,
+        "prev_loss": 2.196261,
+        "current_loss": 2.48853,
+        "delta_loss": -0.292269,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2827,
+          "physical": 0.2827,
+          "unit": "dimensionless",
+          "display": "0.28",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2912,
+          "prev_physical": 0.2912,
+          "delta_normalized": -0.0085
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2826,
+          "physical": 0.2826,
+          "unit": "dimensionless",
+          "display": "0.28",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2762,
+          "prev_physical": 0.2762,
+          "delta_normalized": 0.0064
+        },
+        {
+          "name": "mix",
+          "normalized": 0.5879,
+          "physical": 0.5879,
+          "unit": "dimensionless",
+          "display": "0.59",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.581,
+          "prev_physical": 0.581,
+          "delta_normalized": 0.0069
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.8007,
+          "physical": 2.4133,
+          "unit": "dB",
+          "display": "+2.4 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.7316,
+          "prev_physical": 1.1689,
+          "delta_normalized": 0.0691
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 6,
+      "action": "Distortion",
+      "prev_loss": 2.48853,
+      "current_loss": 2.832247,
+      "step_reward": -3.487171,
+      "reward_breakdown": {
+        "loss_improvement_reward": -3.43717098236084,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -3.4871709823608397,
+        "prev_loss": 2.48853,
+        "current_loss": 2.832247,
+        "delta_loss": -0.343717,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2748,
+          "physical": 0.2748,
+          "unit": "dimensionless",
+          "display": "0.27",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2827,
+          "prev_physical": 0.2827,
+          "delta_normalized": -0.0079
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2885,
+          "physical": 0.2885,
+          "unit": "dimensionless",
+          "display": "0.29",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2826,
+          "prev_physical": 0.2826,
+          "delta_normalized": 0.0059
+        },
+        {
+          "name": "mix",
+          "normalized": 0.5961,
+          "physical": 0.5961,
+          "unit": "dimensionless",
+          "display": "0.60",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5879,
+          "prev_physical": 0.5879,
+          "delta_normalized": 0.0082
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.8688,
+          "physical": 3.6391,
+          "unit": "dB",
+          "display": "+3.6 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.8007,
+          "prev_physical": 2.4133,
+          "delta_normalized": 0.0681
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 7,
+      "action": "Distortion",
+      "prev_loss": 2.832247,
+      "current_loss": 3.234474,
+      "step_reward": -4.072274,
+      "reward_breakdown": {
+        "loss_improvement_reward": -4.022274017333984,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -4.072274017333984,
+        "prev_loss": 2.832247,
+        "current_loss": 3.234474,
+        "delta_loss": -0.402227,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2674,
+          "physical": 0.2674,
+          "unit": "dimensionless",
+          "display": "0.27",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2748,
+          "prev_physical": 0.2748,
+          "delta_normalized": -0.0074
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2939,
+          "physical": 0.2939,
+          "unit": "dimensionless",
+          "display": "0.29",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2885,
+          "prev_physical": 0.2885,
+          "delta_normalized": 0.0055
+        },
+        {
+          "name": "mix",
+          "normalized": 0.6053,
+          "physical": 0.6053,
+          "unit": "dimensionless",
+          "display": "0.61",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5961,
+          "prev_physical": 0.5961,
+          "delta_normalized": 0.0092
+        },
+        {
+          "name": "output_gain",
+          "normalized": 0.9361,
+          "physical": 4.8507,
+          "unit": "dB",
+          "display": "+4.9 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.8688,
+          "prev_physical": 3.6391,
+          "delta_normalized": 0.0673
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 8,
+      "action": "Distortion",
+      "prev_loss": 3.234474,
+      "current_loss": 3.682992,
+      "step_reward": -4.535178,
+      "reward_breakdown": {
+        "loss_improvement_reward": -4.485177993774414,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -4.535177993774414,
+        "prev_loss": 3.234474,
+        "current_loss": 3.682992,
+        "delta_loss": -0.448518,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2604,
+          "physical": 0.2604,
+          "unit": "dimensionless",
+          "display": "0.26",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2674,
+          "prev_physical": 0.2674,
+          "delta_normalized": -0.007
+        },
+        {
+          "name": "tone",
+          "normalized": 0.2991,
+          "physical": 0.2991,
+          "unit": "dimensionless",
+          "display": "0.30",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2939,
+          "prev_physical": 0.2939,
+          "delta_normalized": 0.0052
+        },
+        {
+          "name": "mix",
+          "normalized": 0.6152,
+          "physical": 0.6152,
+          "unit": "dimensionless",
+          "display": "0.62",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6053,
+          "prev_physical": 0.6053,
+          "delta_normalized": 0.0099
+        },
+        {
+          "name": "output_gain",
+          "normalized": 1.0,
+          "physical": 6.0,
+          "unit": "dB",
+          "display": "+6.0 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 0.9361,
+          "prev_physical": 4.8507,
+          "delta_normalized": 0.0639
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 9,
+      "action": "Distortion",
+      "prev_loss": 3.682992,
+      "current_loss": 3.708053,
+      "step_reward": -0.300607,
+      "reward_breakdown": {
+        "loss_improvement_reward": -0.2506065368652344,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -0.30060653686523436,
+        "prev_loss": 3.682992,
+        "current_loss": 3.708053,
+        "delta_loss": -0.025061,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2537,
+          "physical": 0.2537,
+          "unit": "dimensionless",
+          "display": "0.25",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2604,
+          "prev_physical": 0.2604,
+          "delta_normalized": -0.0066
+        },
+        {
+          "name": "tone",
+          "normalized": 0.304,
+          "physical": 0.304,
+          "unit": "dimensionless",
+          "display": "0.30",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2991,
+          "prev_physical": 0.2991,
+          "delta_normalized": 0.0049
+        },
+        {
+          "name": "mix",
+          "normalized": 0.6257,
+          "physical": 0.6257,
+          "unit": "dimensionless",
+          "display": "0.63",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6152,
+          "prev_physical": 0.6152,
+          "delta_normalized": 0.0105
+        },
+        {
+          "name": "output_gain",
+          "normalized": 1.0,
+          "physical": 6.0,
+          "unit": "dB",
+          "display": "+6.0 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 1.0,
+          "prev_physical": 6.0,
+          "delta_normalized": 0.0
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 10,
+      "action": "Distortion",
+      "prev_loss": 3.708053,
+      "current_loss": 3.732634,
+      "step_reward": -0.295807,
+      "reward_breakdown": {
+        "loss_improvement_reward": -0.24580717086791992,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -0.2958071708679199,
+        "prev_loss": 3.708053,
+        "current_loss": 3.732634,
+        "delta_loss": -0.024581,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "drive",
+          "normalized": 0.2472,
+          "physical": 0.2472,
+          "unit": "dimensionless",
+          "display": "0.25",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2537,
+          "prev_physical": 0.2537,
+          "delta_normalized": -0.0066
+        },
+        {
+          "name": "tone",
+          "normalized": 0.3088,
+          "physical": 0.3088,
+          "unit": "dimensionless",
+          "display": "0.31",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.304,
+          "prev_physical": 0.304,
+          "delta_normalized": 0.0048
+        },
+        {
+          "name": "mix",
+          "normalized": 0.6362,
+          "physical": 0.6362,
+          "unit": "dimensionless",
+          "display": "0.64",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6257,
+          "prev_physical": 0.6257,
+          "delta_normalized": 0.0105
+        },
+        {
+          "name": "output_gain",
+          "normalized": 1.0,
+          "physical": 6.0,
+          "unit": "dB",
+          "display": "+6.0 dB",
+          "min_physical": -12.0,
+          "max_physical": 6.0,
+          "prev_normalized": 1.0,
+          "prev_physical": 6.0,
+          "delta_normalized": 0.0
+        }
+      ],
+      "terminated": false,
+      "truncated": true
+    }
+  ],
+  "runtime_sec": 6.267
+}

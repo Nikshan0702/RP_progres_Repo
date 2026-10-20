@@ -66,6 +66,7 @@ def process_audio_pair(
     max_steps: int = 8,
     predictor_ckpt: str | None = None,
     grrl_ckpt: str | None = None,
+    step_images: bool = True,
 ) -> dict:
     """Run full RL audio processing on dry/wet pair."""
     dry_p = Path(dry_path)
@@ -142,7 +143,7 @@ def process_audio_pair(
         "baseline": fs["baseline_name"], "final_loss": fs["current_loss"],
         "improvement_vs_start_pct": fs["improvement_pct"], "improvement_vs_dry_pct": fs["dry_improvement_pct"],
         "cumulative_reward": fs["cumulative_reward"], "total_steps": fs["current_step"], "stop_reason": fs["stop_reason"],
-        "chain": fs["current_chain"], "verification": fs["verification"],
+        "chain": fs["current_chain"], "verification": fs["verification"], "full_length": fs["full_length"],
         "steps": [{k: st.get(k) for k in ("step", "action", "prev_loss", "current_loss", "step_reward", "reward_breakdown", "parameters", "terminated", "truncated")}
                   for st in fs["steps_history"]],
         "runtime_sec": round(time.time() - t0, 3),
@@ -150,6 +151,12 @@ def process_audio_pair(
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(report_data, f, indent=2, allow_nan=False)
     print(f"      ✓ Execution report saved to: {json_path}")
+
+    if mode == "real" and step_images:
+        from rl.visualization.step_images import export_step_pngs
+        img_dir = out_p.with_name(out_p.stem + "_steps")
+        pngs = export_step_pngs(engine, img_dir)
+        print(f"      ✓ {len(pngs)} step PNGs saved to: {img_dir}/")
 
     svg_path = out_p.with_name(out_p.stem + "_charts.svg")
     try:
@@ -161,6 +168,10 @@ def process_audio_pair(
     print("-" * 78)
     print(f" Summary [{fs['mode'].upper()}]: {fs['baseline_name']} loss {fs['start_loss']:.4f} -> {fs['current_loss']:.4f} "
           f"({fs['improvement_pct']:+.1f}% vs {fs['baseline_name']}; {fs['dry_improvement_pct']:+.1f}% vs dry; negative = worse)")
+    if fs["full_length"]:
+        fl = fs["full_length"]
+        print(f" Full-length output: {fl['output_seconds']}s rendered (chain chosen on first {fl['decision_seconds']}s); "
+              f"full loss {fl['full_final_loss']:.4f} vs dry {fl['full_dry_loss']:.4f} ({fl['full_improvement_pct']:+.1f}%)")
     print(f" Sequence: {' -> '.join([item['effect'] for item in fs['current_chain']]) or 'Empty'}")
     print(f" Total Runtime: {report_data['runtime_sec']}s")
     print("=" * 78 + "\n")
@@ -175,6 +186,7 @@ def main() -> None:
     parser.add_argument("--output", type=str, default="audio/rl_synthesized_output.wav", help="Destination path for synthesized WAV")
     parser.add_argument("--mode", type=str, choices=["real", "demo"], default="real", help="Execution mode ('real' or 'demo')")
     parser.add_argument("--warm-start", action="store_true", help="Start from the predictor's chain; reports RL change vs predictor-only")
+    parser.add_argument("--no-step-images", action="store_true", help="skip the per-step PNG export")
     parser.add_argument("--predictor-ckpt", default=None); parser.add_argument("--grrl-ckpt", default=None)
     parser.add_argument("--max-steps", type=int, default=8, help="Maximum sequential actions before termination")
     args = parser.parse_args()
@@ -196,6 +208,7 @@ def run(args) -> dict:
         max_steps=args.max_steps,
         predictor_ckpt=args.predictor_ckpt,
         grrl_ckpt=args.grrl_ckpt,
+        step_images=not args.no_step_images,
     )
 
 

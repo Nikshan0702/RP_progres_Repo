@@ -302,3 +302,23 @@ def test_process_pair_real_without_checkpoint_raises(tmp_path):
     with pytest.raises(RealBackendUnavailable):
         process_audio_pair(DRY, WET, tmp_path / "o.wav", mode="real", grrl_ckpt=str(tmp_path / "nope.pth"))
     assert not (tmp_path / "o.wav").exists()
+
+
+def test_step_png_export_matches_session(engine, tmp_path):
+    from rl.visualization.step_images import export_step_pngs
+    engine.initialize_session(DRY, WET, mode="real", max_steps=4)
+    s = engine.run_all()
+    paths = export_step_pngs(engine, tmp_path / "png")
+    names = sorted(p.name for p in paths)
+    assert names == sorted([f"step_{i:02d}.png" for i in range(s["current_step"] + 1)] + ["summary.png"])
+    assert len(engine.step_audio) == s["current_step"] + 1
+    assert all(p.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and p.stat().st_size > 5000 for p in paths)
+    # the last recorded audio is exactly the env's final decision-crop render
+    assert torch.equal(engine.step_audio[-1], engine.env.current_audio.cpu())
+
+
+def test_step_png_export_refuses_demo(tmp_path, engine):
+    from rl.visualization.step_images import export_step_pngs
+    engine.initialize_session(DRY, WET, mode="demo")
+    with pytest.raises(ValueError, match="demo"):
+        export_step_pngs(engine, tmp_path)
