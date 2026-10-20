@@ -123,6 +123,23 @@
   // =========================================================================
   // API Calls
   // =========================================================================
+  // Errors from the backend (e.g. 503 real backend unavailable) are surfaced, never turned into demo data.
+  async function parseResponse(res) {
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* non-JSON error body */ }
+    if (!res.ok) {
+      throw new Error((data && data.error) || `HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  function showBackendUnavailable(reason) {
+    els.modeBanner.className = 'mode-banner demo';
+    els.bannerBadge.textContent = 'REAL BACKEND UNAVAILABLE';
+    els.bannerText.innerHTML = 'Real RL execution cannot run: <b>' + String(reason || 'unknown reason').replace(/[<>&]/g, '') +
+      '</b>. Nothing is substituted; choose <b>Demo Mode</b> explicitly for scripted, SIMULATED output.';
+  }
+
   async function fetchStatus() {
     try {
       const res = await fetch('/api/status');
@@ -130,7 +147,7 @@
       state.hasRealAgent = data.has_real_agent;
       state.presets = data.presets || [];
       if (!state.hasRealAgent) {
-        setMode('demo');
+        showBackendUnavailable(data.backend_error);   // no silent switch to demo
       }
       return data;
     } catch (e) {
@@ -151,11 +168,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       updateStateFromSummary(data);
     } catch (e) {
       console.error('Initialize failed:', e);
       alert('Initialization error: ' + e.message);
+      if (state.mode === 'real') showBackendUnavailable(e.message);
     } finally {
       setLoading(false);
     }
@@ -168,7 +186,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       updateStateFromSummary(data);
     } catch (e) {
       console.error('Step failed:', e);
@@ -185,7 +203,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       updateStateFromSummary(data);
     } catch (e) {
       console.error('Run all failed:', e);
@@ -202,7 +220,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       updateStateFromSummary(data);
       // Re-initialize with currently selected preset
       initCurrentPreset();
@@ -236,7 +254,11 @@
     state.isTerminated = summary.is_terminated;
     state.currentStep = summary.current_step;
     state.maxSteps = summary.max_steps;
-    state.initialLoss = summary.initial_loss;
+    state.simulated = !!summary.simulated;
+    state.baselineName = summary.baseline_name || 'dry';
+    state.dryLoss = summary.dry_loss;
+    state.predictorLoss = summary.predictor_loss;
+    state.initialLoss = summary.baseline_loss !== undefined && summary.baseline_loss !== null ? summary.baseline_loss : summary.initial_loss;
     state.currentLoss = summary.current_loss;
     state.cumulativeReward = summary.cumulative_reward;
     state.improvementPct = summary.improvement_pct;
@@ -264,8 +286,9 @@
       if (outputStage.data.final_metrics) {
         document.getElementById('metrics-output').textContent = `${outputStage.data.final_metrics.sample_rate}Hz • ${outputStage.data.final_metrics.peak_db} dB`;
       }
-      els.btnDownloadOutput.disabled = false;
-      document.querySelector('[data-track="output"]').disabled = false;
+      const hasAudio = !summary.simulated && summary.has_output_audio;
+      els.btnDownloadOutput.disabled = !hasAudio;
+      document.querySelector('[data-track="output"]').disabled = !hasAudio;
 
       // Set audio sources for playback
       if (outputStage.data.base64_audio) {
@@ -280,7 +303,7 @@
     // Set dry and wet audio sources via API streaming
     els.audioPlayers.dry.src = '/api/audio?type=dry';
     els.audioPlayers.wet.src = '/api/audio?type=wet';
-    if (!els.audioPlayers.output.src && state.isTerminated) {
+    if (!els.audioPlayers.output.src && state.isTerminated && !summary.simulated && summary.has_output_audio) {
       els.audioPlayers.output.src = '/api/audio?type=output';
     }
 
@@ -299,13 +322,18 @@
   }
 
   function renderKPIs() {
+    const lbl = document.getElementById('kpi-initial-label');
+    if (lbl) {
+      lbl.textContent = (state.baselineName === 'predictor' ? 'Start Loss (Predictor-only)' : 'Initial Loss (Dry)') + (state.simulated ? ' [SIMULATED]' : '');
+    }
+    els.kpiInitialLoss.title = `dry ${state.dryLoss}; predictor ${state.predictorLoss}`;
     els.kpiInitialLoss.textContent = state.initialLoss < 900 ? state.initialLoss.toFixed(4) : '--';
     els.kpiCurrentLoss.textContent = state.currentLoss < 900 ? state.currentLoss.toFixed(4) : '--';
 
     const delta = state.initialLoss < 900 ? state.initialLoss - state.currentLoss : 0;
     els.kpiDeltaLoss.textContent = `Δ ${delta >= 0 ? '-' : '+'}${Math.abs(delta).toFixed(4)}`;
 
-    els.kpiImprovement.textContent = `${state.improvementPct.toFixed(1)}%`;
+    els.kpiImprovement.textContent = `${state.improvementPct >= 0 ? '+' : ''}${state.improvementPct.toFixed(1)}%`;  // signed: negative = degradation
     els.kpiReward.textContent = `${state.cumulativeReward >= 0 ? '+' : ''}${state.cumulativeReward.toFixed(3)}`;
     els.kpiChainLen.textContent = `${state.currentChain.length} / ${state.maxSteps}`;
     els.kpiStepCount.textContent = `Step ${state.currentStep} ${state.isTerminated ? '(Finished)' : ''}`;
@@ -511,7 +539,7 @@
         <div class="node-badge">OUTPUT</div>
         <div class="node-icon">🔊</div>
         <div class="node-name">Final Audio</div>
-        <div class="node-meta">+${state.improvementPct.toFixed(1)}% Imprv.</div>
+        <div class="node-meta">${state.improvementPct >= 0 ? "+" : ""}${state.improvementPct.toFixed(1)}% vs ${state.baselineName}</div>
       `;
       els.actionChainFlow.appendChild(outNode);
     }
@@ -1045,7 +1073,7 @@
       els.modeBanner.className = 'mode-banner real';
       els.bannerBadge.textContent = 'REAL RL POLICY';
       els.bannerText.innerHTML =
-        'Executing PyTorch Differentiable Audio Processing Network (DAPN) with trained GRRL checkpoint (<code>checkpoints/grrl/best_grrl_model.pth</code>) and Multi-Resolution STFT Loss.';
+        'Executing PyTorch Differentiable Audio Processing Network (DAPN) with trained GRRL checkpoint (<code>checkpoints_v2/grrl/best_grrl_model.pth</code>) and Multi-Resolution STFT Loss.';
     }
     // Re-initialize session in selected mode
     initCurrentPreset();
@@ -1118,7 +1146,7 @@
           mode: state.mode,
         }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       updateStateFromSummary(data);
     } catch (e) {
       console.error('Upload failed:', e);

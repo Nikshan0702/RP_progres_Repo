@@ -45,19 +45,17 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true", help="Do not automatically launch web browser")
     args = parser.parse_args()
 
-    # Pre-configure mode if specified
-    if args.mode:
-        VisualizationRequestHandler.engine.mode = args.mode
+    engine = VisualizationRequestHandler.get_engine()
+    if args.mode == "real" and not engine.has_real_agent:
+        print(f"ERROR: real mode requested but unavailable: {engine.backend_error}", file=sys.stderr)
+        raise SystemExit(2)   # never silently continue in demo
 
     if args.dry and args.wet:
         try:
-            VisualizationRequestHandler.engine.initialize_session(
-                dry_path=args.dry,
-                wet_path=args.wet,
-                mode=args.mode or "real",
-            )
+            engine.initialize_session(dry_path=args.dry, wet_path=args.wet, mode=args.mode or "real")
         except Exception as e:
-            print(f"Warning: Failed to pre-load audio pair ({args.dry}, {args.wet}): {e}")
+            print(f"ERROR: failed to pre-load audio pair ({args.dry}, {args.wet}): {e}", file=sys.stderr)
+            raise SystemExit(2)
 
     run_server(host=args.host, port=args.port, open_browser=not args.no_browser)
 

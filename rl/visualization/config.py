@@ -18,10 +18,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 
-# Checkpoint paths
-DEFAULT_PREDICTOR_CKPT = PROJECT_ROOT / "checkpoints" / "best_model.pth"
-DEFAULT_GRRL_CKPT = PROJECT_ROOT / "checkpoints" / "grrl" / "best_grrl_model.pth"
-DEFAULT_PPO_CKPT = PROJECT_ROOT / "checkpoints" / "ppo" / "best_ppo_model.pth"
+# Checkpoint paths (schema-v2; legacy checkpoints/ files are incompatible and never loaded)
+DEFAULT_PREDICTOR_CKPT = PROJECT_ROOT / "checkpoints_v2" / "best_model.pth"
+DEFAULT_GRRL_CKPT = PROJECT_ROOT / "checkpoints_v2" / "grrl" / "best_grrl_model.pth"
+DEFAULT_PPO_CKPT = PROJECT_ROOT / "checkpoints_v2" / "ppo" / "best_ppo_model.pth"
 
 # Preset audio file pairs
 DEFAULT_PRESETS = [
@@ -75,7 +75,7 @@ WORKFLOW_STAGES = [
         "id": "state",
         "name": "RL Agent State",
         "title": "RL Agent State Representation",
-        "description": "Constructs acoustic spectral distance, chain history, and progress features (148 dims).",
+        "description": "Constructs acoustic spectral distance, chain history, and progress features (188 dims).",
         "icon": "state",
     },
     {

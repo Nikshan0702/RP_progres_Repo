@@ -107,24 +107,25 @@ class TestStateExtractor:
         assert freq_item["delta_normalized"] == pytest.approx(0.3, abs=1e-4)
 
     def test_extract_observation_diagnostics(self):
-        obs = torch.randn(148)
+        obs = torch.randn(188)
         diag = extract_observation_diagnostics(obs)
 
-        assert diag["total_dim"] == 148
+        assert diag["total_dim"] == 188
+        assert len(diag["slot_parameters"]) == 8
         assert len(diag["acoustic_profile"]) == 64
         assert len(diag["chain_history_slots"]) == 8
         assert "step_progress_pct" in diag["metrics"]
         assert len(diag["taste_vector"]) == 16
 
     def test_extract_action_diagnostics(self):
-        logits = torch.tensor([1.0, 2.0, 0.5, 3.5, 0.2, 0.1, 0.1, -1.0])
-        mask = torch.tensor([True, True, True, True, True, True, True, False])
+        logits = torch.tensor([1.0, 2.0, 0.5, 3.5, 0.2, 0.1, 0.1, -1.0, 0.0])
+        mask = torch.tensor([True, True, True, True, True, True, True, False, True])
         diag = extract_action_diagnostics(logits, mask, chosen_action_idx=3, value_estimate=1.25)
 
         assert diag["chosen_action_idx"] == 3
         assert diag["chosen_action"] == "Reverb"
         assert diag["value_estimate"] == 1.25
-        assert len(diag["distribution"]) == 8
+        assert len(diag["distribution"]) == 9
 
         stop_action = diag["distribution"][7]
         assert stop_action["is_valid"] is False
@@ -183,28 +184,16 @@ class TestWorkflowEngine:
     def test_workflow_engine_real_backend(self):
         engine = WorkflowEngine()
         if not engine.has_real_agent:
-            pytest.skip("Trained GRRL checkpoint not present on disk.")
-
-        dry_path = DEFAULT_PRESETS[0]["dry_path"]
-        wet_path = DEFAULT_PRESETS[0]["wet_path"]
-
-        summary = engine.initialize_session(
-            dry_path=dry_path,
-            wet_path=wet_path,
-            mode="real",
-            max_steps=5,
-        )
-        assert summary["mode"] == "real"
-        assert summary["is_initialized"] is True
-
-        # Run to completion
-        final_summary = engine.run_all()
-        assert final_summary["is_terminated"] is True
-        assert final_summary["current_step"] >= 1
-        assert final_summary["current_loss"] < final_summary["initial_loss"]
-        assert final_summary["improvement_pct"] > 0
-        assert engine.final_audio_tensor is not None
-        assert torch.isfinite(engine.final_audio_tensor).all()
+            pytest.skip("Trained schema-v2 GRRL checkpoint not present on disk.")
+        summary = engine.initialize_session(DEFAULT_PRESETS[0]["dry_path"], DEFAULT_PRESETS[0]["wet_path"], mode="real", max_steps=5)
+        assert summary["mode"] == "real" and summary["is_initialized"] is True
+        final = engine.run_all()
+        # A trained checkpoint may or may not improve on a given pair; the dashboard must report the truth.
+        assert final["is_terminated"] is True and final["current_step"] >= 1
+        assert engine.final_audio_tensor is not None and torch.isfinite(engine.final_audio_tensor).all()
+        assert final["verification"]["chain_matches_audio"] is True
+        expected = 100 * (final["start_loss"] - final["current_loss"]) / max(abs(final["start_loss"]), 1e-8)
+        assert final["improvement_pct"] == pytest.approx(expected, abs=1e-3)
 
 
 class TestServerRequestHandler:
@@ -237,6 +226,7 @@ class TestServerRequestHandler:
         assert "DAPN RL Audio Synthesis Studio" in resp_index
 
         # Test POST /api/initialize
+        VisualizationRequestHandler.engine = WorkflowEngine()
         h_init = DirectHandler("POST", "/api/initialize", json.dumps({"mode": "demo"}).encode("utf-8"))
         h_init.do_POST()
         resp_init = h_init.wfile.getvalue().decode("utf-8")

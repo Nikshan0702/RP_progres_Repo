@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from xml.sax.saxutils import escape
 from typing import Any
 
 
@@ -26,7 +27,10 @@ def export_svg_charts(summary: dict[str, Any], output_path: str | Path) -> Path:
     chain = summary.get("current_chain", [])
     init_loss = summary.get("initial_loss", 7.0)
     final_loss = summary.get("current_loss", 2.5)
-    imprv = summary.get("improvement_pct", 0.0)
+    imprv = float(summary.get("improvement_pct", 0.0))
+    mode_label = escape(str(summary.get("mode", "unknown")).upper() + (" (SIMULATED)" if summary.get("simulated") else ""))
+    base_name = escape(str(summary.get("baseline_name", "initial")))
+    base_loss = float(summary.get("baseline_loss", init_loss))
     cum_rew = summary.get("cumulative_reward", 0.0)
 
     w = 900
@@ -45,14 +49,14 @@ def export_svg_charts(summary: dict[str, Any], output_path: str | Path) -> Path:
         # Header Banner
         '<rect x="20" y="20" width="860" height="70" rx="10" fill="url(#gradCard)" stroke="#1e293b" stroke-width="1"/>',
         '<text x="40" y="52" fill="#38bdf8" font-size="18" font-weight="bold">DAPN RL Audio Synthesis — Execution Graphs</text>',
-        f'<text x="40" y="74" fill="#94a3b8" font-size="12">Loss: {init_loss:.4f} &rarr; {final_loss:.4f} (+{imprv:.1f}% improvement) | Cumulative Reward: {cum_rew:+.3f} | Steps: {len(loss_hist)-1}</text>',
+        f'<text x="40" y="74" fill="#94a3b8" font-size="12">[{mode_label}] {base_name} loss {base_loss:.4f} &#8594; {final_loss:.4f} ({imprv:+.1f}% vs {base_name}) | Dry {init_loss:.4f} | Cumulative Reward: {cum_rew:+.3f} | Steps: {max(len(loss_hist)-1, 0)}</text>',
     ]
 
     # Action Sequence Ribbon (Y: 105 to 155)
     svg_parts.append('<rect x="20" y="105" width="860" height="52" rx="8" fill="#111c34" stroke="#1e293b" stroke-width="1"/>')
     svg_parts.append('<text x="35" y="136" fill="#cbd5e1" font-size="12" font-weight="bold">FX Chain:</text>')
 
-    chain_seq = ["Dry Input"] + [item["effect"] for item in chain] + ["Final Output"]
+    chain_seq = ["Dry Input"] + [escape(str(item["effect"])) for item in chain] + ["Final Output"]
     x_pos = 110
     for idx, eff in enumerate(chain_seq):
         color = "#3b82f6" if idx == 0 else ("#10b981" if idx == len(chain_seq) - 1 else "#6366f1")
@@ -60,7 +64,7 @@ def export_svg_charts(summary: dict[str, Any], output_path: str | Path) -> Path:
         svg_parts.append(f'<text x="{x_pos + 47}" y="135" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">{eff}</text>')
         x_pos += 105
         if idx < len(chain_seq) - 1:
-            svg_parts.append(f'<text x="{x_pos - 6}" y="135" fill="#64748b" font-size="12" text-anchor="middle">&rarr;</text>')
+            svg_parts.append(f'<text x="{x_pos - 6}" y="135" fill="#64748b" font-size="12" text-anchor="middle">&#8594;</text>')
 
     # -------------------------------------------------------------
     # 1. Loss Chart (Left)
@@ -68,7 +72,7 @@ def export_svg_charts(summary: dict[str, Any], output_path: str | Path) -> Path:
     lx, ly, lw, lh = 20, 175, 420, 390
     svg_parts.append(f'<rect x="{lx}" y="{ly}" width="{lw}" height="{lh}" rx="10" fill="url(#gradCard)" stroke="#1e293b" stroke-width="1"/>')
     svg_parts.append(f'<text x="{lx + 20}" y="{ly + 32}" fill="#f8fafc" font-size="14" font-weight="bold">Multi-Resolution STFT Loss</text>')
-    svg_parts.append(f'<text x="{lx + 20}" y="{ly + 50}" fill="#94a3b8" font-size="11">Spectral distance convergence across steps</text>')
+    svg_parts.append(f'<text x="{lx + 20}" y="{ly + 50}" fill="#94a3b8" font-size="11">Lower is better; step 0 = RL starting point</text>')
 
     # Plot area
     px, py, pw, ph = lx + 55, ly + 75, lw - 80, lh - 110
@@ -92,7 +96,7 @@ def export_svg_charts(summary: dict[str, Any], output_path: str | Path) -> Path:
     # X-Axis Ticks
     for s_i in range(n_steps + 1):
         x_coord, _ = to_loss_coord(s_i, 0)
-        label = "Dry" if s_i == 0 else f"S{s_i}"
+        label = "Start" if s_i == 0 else f"S{s_i}"
         svg_parts.append(f'<text x="{x_coord}" y="{py + ph + 20}" fill="#64748b" font-size="10" text-anchor="middle">{label}</text>')
 
     # Target threshold (0.40) line

@@ -160,10 +160,13 @@ def tensor_to_wav_bytes(
         tensor = tensor.squeeze(0)
     if tensor.ndim == 1:
         tensor = tensor.unsqueeze(0)  # (1, T)
+    if tensor.numel() == 0 or not torch.isfinite(tensor).all():
+        raise ValueError("Cannot encode empty or non-finite audio")
 
     channels, total_frames = tensor.shape
     clamped = torch.clamp(tensor, -1.0, 1.0)
-    int_samples = (clamped * 32767.0).to(torch.int16).t().flatten().tolist()
+    # Same quantisation as audio_io.save_audio (round, not truncate) so downloads match saved files.
+    int_samples = (clamped * 32767.0).round().to(torch.int16).t().flatten().tolist()
 
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:

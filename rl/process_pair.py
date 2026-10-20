@@ -12,8 +12,11 @@ python3 rl/process_pair.py --dry audio/dry.wav --wet audio/wet.wav
 # Custom output destination and max steps:
 python3 rl/process_pair.py --dry audio/dry.wav --wet audio/wet.wav --output audio/my_result.wav --max-steps 6
 
-# Enable M2 predictor warm-start:
+# Enable predictor warm-start (RL result is compared against the predictor-only chain):
 python3 rl/process_pair.py --dry audio/dry.wav --wet audio/wet.wav --warm-start
+
+Real mode fails with a non-zero exit if the GRRL/predictor checkpoints are missing or incompatible;
+it never falls back to demo. ``--mode demo`` is scripted/simulated and writes no audio.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from rl.visualization.audio_utils import save_audio_to_path
 from rl.visualization.chart_exporter import export_svg_charts
-from rl.visualization.workflow_engine import WorkflowEngine
+from rl.visualization.workflow_engine import RealBackendUnavailable, WorkflowEngine
 
 
 def format_step_row(step_info: dict) -> str:
@@ -44,7 +47,7 @@ def format_step_row(step_info: dict) -> str:
     reward = step_info["step_reward"]
     imprv = step_info["improvement_pct"]
 
-    delta_sign = "-" if delta_l >= 0 else "+"
+    delta_sign = "-" if delta_l >= 0 else "+"  # '-' = loss went DOWN (better)
     rew_sign = "+" if reward >= 0 else ""
 
     return (
@@ -61,6 +64,8 @@ def process_audio_pair(
     mode: str = "real",
     use_warm_start: bool = False,
     max_steps: int = 8,
+    predictor_ckpt: str | None = None,
+    grrl_ckpt: str | None = None,
 ) -> dict:
     """Run full RL audio processing on dry/wet pair."""
     dry_p = Path(dry_path)
@@ -78,13 +83,14 @@ def process_audio_pair(
     print(f" Dry Input:       {dry_p}")
     print(f" Wet Reference:   {wet_p}")
     print(f" Output Target:   {out_p}")
-    print(f" Mode:            {mode.upper()}")
+    print(f" Mode:            {mode.upper()}{' (SIMULATED - no audio is synthesized)' if mode == 'demo' else ''}")
     print(f" Max Steps:       {max_steps}")
     print(f" M2 Warm-Start:   {use_warm_start}")
     print("-" * 78)
 
     t0 = time.time()
-    engine = WorkflowEngine()
+    kw = {k: v for k, v in (('predictor_ckpt', predictor_ckpt), ('grrl_ckpt', grrl_ckpt)) if v}
+    engine = WorkflowEngine(**kw)
 
     # Stage 1 & 2: Upload & Preprocessing
     print("[1/3] Loading and preprocessing audio pair...")
@@ -96,8 +102,11 @@ def process_audio_pair(
         max_steps=max_steps,
     )
 
-    init_loss = summary["initial_loss"]
-    print(f"      Initial Baseline Loss (MR-STFT): {init_loss:.4f}\n")
+    init_loss = summary["start_loss"]
+    print(f"      Dry loss (MR-STFT)       : {summary['dry_loss']:.4f}")
+    if summary["predictor_loss"] is not None:
+        print(f"      Predictor-only loss      : {summary['predictor_loss']:.4f}  <- RL baseline")
+    print(f"      RL starting loss         : {init_loss:.4f} ({summary['baseline_name']})\n")
 
     # Step-by-step RL Execution Loop
     print("[2/3] Executing RL Agent Action Loop:")
@@ -115,43 +124,44 @@ def process_audio_pair(
 
     # Stage 11: Final audio rendering & saving
     print("\n[3/3] Finalizing audio output and reports...")
-    final_summary = engine.get_summary()
-
-    if engine.final_audio_tensor is not None:
+    fs = engine.get_summary()
+    if mode == "real" and engine.final_audio_tensor is not None:
         save_audio_to_path(engine.final_audio_tensor, out_p, sample_rate=engine.sample_rate)
         print(f"      ✓ Synthesized WAV saved to: {out_p}")
+    elif mode == "real":
+        print("      ✗ Episode did not finish (no final audio).")
     else:
-        print("      ⚠️ Final audio tensor was empty.")
+        print("      (demo mode: no audio synthesized)")
 
-    # Save JSON report
     json_path = out_p.with_suffix(".json")
     report_data = {
-        "dry_input": str(dry_p),
-        "wet_reference": str(wet_p),
-        "output_audio": str(out_p),
-        "initial_loss": final_summary["initial_loss"],
-        "final_loss": final_summary["current_loss"],
-        "improvement_pct": final_summary["improvement_pct"],
-        "cumulative_reward": final_summary["cumulative_reward"],
-        "total_steps": final_summary["current_step"],
-        "chain": final_summary["current_chain"],
+        "execution_mode": fs["mode"], "requested_mode": fs["requested_mode"], "simulated": fs["simulated"],
+        "warm_started": fs["warm_started"], "dry_input": str(dry_p), "wet_reference": str(wet_p),
+        "output_audio": str(out_p) if engine.final_audio_tensor is not None else None,
+        "dry_loss": fs["dry_loss"], "predictor_loss": fs["predictor_loss"], "start_loss": fs["start_loss"],
+        "baseline": fs["baseline_name"], "final_loss": fs["current_loss"],
+        "improvement_vs_start_pct": fs["improvement_pct"], "improvement_vs_dry_pct": fs["dry_improvement_pct"],
+        "cumulative_reward": fs["cumulative_reward"], "total_steps": fs["current_step"], "stop_reason": fs["stop_reason"],
+        "chain": fs["current_chain"], "verification": fs["verification"],
+        "steps": [{k: st.get(k) for k in ("step", "action", "prev_loss", "current_loss", "step_reward", "reward_breakdown", "parameters", "terminated", "truncated")}
+                  for st in fs["steps_history"]],
         "runtime_sec": round(time.time() - t0, 3),
     }
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(report_data, f, indent=2)
+        json.dump(report_data, f, indent=2, allow_nan=False)
     print(f"      ✓ Execution report saved to: {json_path}")
 
-    # Save SVG Charts Graph
     svg_path = out_p.with_name(out_p.stem + "_charts.svg")
     try:
-        export_svg_charts(final_summary, svg_path)
+        export_svg_charts(fs, svg_path)
         print(f"      ✓ Vector graphs (SVG) saved to: {svg_path}")
     except Exception as e:
         print(f"      ⚠️ Failed to export SVG charts: {e}")
 
     print("-" * 78)
-    print(f" Summary: Loss {init_loss:.4f} -> {final_summary['current_loss']:.4f} (+{final_summary['improvement_pct']:.1f}% improvement)")
-    print(f" Sequence: {' -> '.join([item['effect'] for item in final_summary['current_chain']]) or 'Empty'}")
+    print(f" Summary [{fs['mode'].upper()}]: {fs['baseline_name']} loss {fs['start_loss']:.4f} -> {fs['current_loss']:.4f} "
+          f"({fs['improvement_pct']:+.1f}% vs {fs['baseline_name']}; {fs['dry_improvement_pct']:+.1f}% vs dry; negative = worse)")
+    print(f" Sequence: {' -> '.join([item['effect'] for item in fs['current_chain']]) or 'Empty'}")
     print(f" Total Runtime: {report_data['runtime_sec']}s")
     print("=" * 78 + "\n")
 
@@ -164,17 +174,28 @@ def main() -> None:
     parser.add_argument("--wet", "--target", type=str, required=True, dest="wet", help="Path to target Wet reference WAV file")
     parser.add_argument("--output", type=str, default="audio/rl_synthesized_output.wav", help="Destination path for synthesized WAV")
     parser.add_argument("--mode", type=str, choices=["real", "demo"], default="real", help="Execution mode ('real' or 'demo')")
-    parser.add_argument("--warm-start", action="store_true", help="Use M2 InverseFXNet predictor warm-start candidate")
+    parser.add_argument("--warm-start", action="store_true", help="Start from the predictor's chain; reports RL change vs predictor-only")
+    parser.add_argument("--predictor-ckpt", default=None); parser.add_argument("--grrl-ckpt", default=None)
     parser.add_argument("--max-steps", type=int, default=8, help="Maximum sequential actions before termination")
     args = parser.parse_args()
 
-    process_audio_pair(
+    try:
+        run(args)
+    except RealBackendUnavailable as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2)
+
+
+def run(args) -> dict:
+    return process_audio_pair(
         dry_path=args.dry,
         wet_path=args.wet,
         output_path=args.output,
         mode=args.mode,
         use_warm_start=args.warm_start,
         max_steps=args.max_steps,
+        predictor_ckpt=args.predictor_ckpt,
+        grrl_ckpt=args.grrl_ckpt,
     )
 
 

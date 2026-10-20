@@ -98,13 +98,14 @@ def map_parameters_with_physical(
 
 
 def extract_observation_diagnostics(obs_tensor: torch.Tensor | None) -> dict[str, Any]:
-    """Break down the 148-dimensional GRRL observation vector into readable sub-components.
+    """Break down the 188-dimensional GRRL observation vector into readable sub-components.
 
-    Observation Layout (148 dims):
-      - [0:64]    Acoustic distance embedding (Multi-FFT spectral diff bins)
+    Observation Layout (188 dims, matches GRRLEnv._get_observation):
+      - [0:64]    Acoustic distance embedding (spectral difference bins)
       - [64:128]  Ordered chain history (8 slots * 8 classes one-hot)
-      - [128:132] Step progress & loss scalar metrics
+      - [128:132] Step progress, chain occupancy, normalized loss, improvement ratio vs start
       - [132:148] PTA Taste conditioning vector (16 dims)
+      - [148:188] Explicit parameter values of the 8 history slots (8 x 5, normalized)
     """
     if obs_tensor is None:
         return {
@@ -156,12 +157,18 @@ def extract_observation_diagnostics(obs_tensor: torch.Tensor | None) -> dict[str
         taste_slice = flat[132:148].tolist()
         taste_vector = [round(v, 3) for v in taste_slice]
 
+    slot_params = []
+    if total_dim >= 188:
+        pm = flat[148:188].view(8, 5)
+        slot_params = [[round(float(v), 4) for v in row] for row in pm]
+
     return {
         "total_dim": total_dim,
         "acoustic_profile": acoustic_profile,
         "chain_history_slots": history_slots,
         "metrics": metrics,
         "taste_vector": taste_vector,
+        "slot_parameters": slot_params,
     }
 
 
@@ -173,7 +180,7 @@ def extract_action_diagnostics(
 ) -> dict[str, Any]:
     """Format discrete action probabilities, action mask, and policy diagnostics."""
     action_items = []
-    actions_list = EFFECT_ACTIONS  # 7 effects + STOP
+    actions_list = EFFECT_ACTIONS  # 7 effects + STOP + BACKTRACK
 
     if logits is not None and logits.numel() >= NUM_EFFECT_ACTIONS:
         flat_logits = logits.detach().cpu().float().flatten()[:NUM_EFFECT_ACTIONS]
@@ -201,6 +208,8 @@ def extract_action_diagnostics(
         if not is_valid:
             if act_name == "STOP":
                 mask_reason = "Minimum chain length not yet met"
+            elif act_name == "BACKTRACK":
+                mask_reason = "Nothing to remove, or too few steps left to restore the minimum chain"
             else:
                 mask_reason = "Effect already used or max length reached"
 
@@ -214,6 +223,7 @@ def extract_action_diagnostics(
             "is_selected": is_selected,
             "mask_reason": mask_reason,
             "is_stop": (idx == STOP_ACTION_IDX),
+            "is_backtrack": (act_name == "BACKTRACK"),
         })
 
     chosen_name = actions_list[chosen_action_idx] if 0 <= chosen_action_idx < len(actions_list) else "UNKNOWN"
@@ -230,43 +240,45 @@ def extract_action_diagnostics(
 def compute_reward_breakdown(
     prev_loss: float,
     current_loss: float,
-    initial_loss: float,
-    is_terminal: bool,
-    target_achieved: bool,
+    initial_loss: float | None = None,
+    is_terminal: bool = False,
+    target_achieved: bool = False,
     step_penalty: float = 0.05,
     action_was_masked: bool = False,
     is_stop_action: bool = False,
     chain_length: int = 0,
+    *,
+    length_penalty: float = 0.0,
+    chain_length_before: int | None = None,
+    started_above_target: bool = True,
 ) -> dict[str, Any]:
-    """Calculate structured reward components for transparency and visualization."""
+    """Reward components with the SAME formula and signs as ``GRRLEnv.step`` (lower loss is better):
+
+      loss_improvement_reward = +10 * (prev_loss - current_loss)
+      step_penalty            = -step_penalty                      (0 for STOP)
+      length_penalty          = -length_penalty * (len_after - len_before)
+      terminal_bonus          = +3 if the target was reached and the episode started above target
+      total_step_reward       = sum of the four components
+
+    The live dashboard uses ``info['reward_breakdown']`` from the environment directly; this helper
+    exists for offline reconstruction and is tested to agree with the environment.
+    ``initial_loss``/``is_terminal``/``action_was_masked`` are accepted for backward compatibility
+    and do not affect the result (masked actions are rejected by the environment, not penalised).
+    """
     delta_loss = prev_loss - current_loss
-    loss_improvement_reward = delta_loss * 10.0
-    penalty = step_penalty
-    mask_penalty = 0.5 if action_was_masked else 0.0
-    terminal_bonus = 0.0
-
-    if is_stop_action or is_terminal:
-        improvement_pct = max(0.0, (1.0 - current_loss / (initial_loss + 1e-8)) * 100.0)
-        if target_achieved:
-            terminal_bonus += 3.0
-        if chain_length == 0:
-            terminal_bonus -= 1.0
-        else:
-            terminal_bonus += (improvement_pct / 100.0) * 2.0
-
-    total_step_reward = (
-        terminal_bonus if is_stop_action
-        else (loss_improvement_reward - penalty - mask_penalty + (3.0 if target_achieved else 0.0))
-    )
-
+    before = chain_length if chain_length_before is None else chain_length_before
+    components = {
+        "loss_improvement_reward": 10.0 * delta_loss,
+        "step_penalty": 0.0 if is_stop_action else -step_penalty,
+        "length_penalty": -length_penalty * (chain_length - before),
+        "terminal_bonus": 3.0 if (target_achieved and started_above_target) else 0.0,
+    }
+    total = sum(components.values())
     return {
-        "prev_loss": round(prev_loss, 5),
-        "current_loss": round(current_loss, 5),
-        "delta_loss": round(delta_loss, 5),
-        "loss_improvement_reward": round(loss_improvement_reward, 4),
-        "step_penalty": round(-penalty, 4),
-        "mask_penalty": round(-mask_penalty, 4) if mask_penalty > 0 else 0.0,
-        "terminal_bonus": round(terminal_bonus, 4),
-        "total_step_reward": round(total_step_reward, 4),
+        "prev_loss": round(prev_loss, 6),
+        "current_loss": round(current_loss, 6),
+        "delta_loss": round(delta_loss, 6),
+        **{k: round(v, 6) for k, v in components.items()},
+        "total_step_reward": round(total, 6),
         "target_achieved": target_achieved,
     }
