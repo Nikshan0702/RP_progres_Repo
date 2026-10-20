@@ -1,4 +1,13 @@
-"""Shared pair contract: finite mono float32, aligned crop, safe STFT length."""
+"""Shared pair contract: finite mono float32, aligned crop, safe STFT length.
+
+Two distinct duration limits (both explicit):
+  * system limit  : ``audio.max_duration_seconds`` (10 s) in config/system_config.yaml - the longest clip DAPN/IO accept
+                    (audio_io.load_audio truncates longer files with a logged warning).
+  * RL/predictor crop: ``duration`` (default 2.0 s, must be <= the system limit) - ONLY the first ``duration`` seconds of
+                    an aligned dry/wet pair are used for training, evaluation, rewards and the dashboard. Longer input is
+                    cropped, not resampled; shorter input is zero-padded only up to the minimum STFT length (1025 samples).
+All of 44.1 kHz / mono are enforced by audio_io (resampling + downmix at load time) and validated here.
+"""
 import torch
 import torch.nn.functional as F
 from common.config_loader import get_sample_rate, get_max_duration_seconds

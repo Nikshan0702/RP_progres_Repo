@@ -42,9 +42,15 @@ def main() -> None:
     parser.add_argument("--mode", type=str, choices=["real", "demo"], default=None, help="Execution mode override")
     parser.add_argument("--dry", type=str, default=None, help="Path to initial dry WAV file")
     parser.add_argument("--wet", type=str, default=None, help="Path to initial wet reference WAV file")
+    parser.add_argument("--predictor-ckpt", type=str, default=None, help="schema-v2 predictor checkpoint (default: checkpoints_v2/best_model.pth)")
+    parser.add_argument("--grrl-ckpt", type=str, default=None, help="schema-v2 GRRL checkpoint (default: checkpoints_v2/grrl/best_grrl_model.pth)")
     parser.add_argument("--no-browser", action="store_true", help="Do not automatically launch web browser")
     args = parser.parse_args()
 
+    if args.predictor_ckpt or args.grrl_ckpt:
+        from rl.visualization.workflow_engine import WorkflowEngine
+        kw = {k: v for k, v in (("predictor_ckpt", args.predictor_ckpt), ("grrl_ckpt", args.grrl_ckpt)) if v}
+        VisualizationRequestHandler.engine = WorkflowEngine(**kw)
     engine = VisualizationRequestHandler.get_engine()
     if args.mode == "real" and not engine.has_real_agent:
         print(f"ERROR: real mode requested but unavailable: {engine.backend_error}", file=sys.stderr)

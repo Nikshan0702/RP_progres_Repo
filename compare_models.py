@@ -40,9 +40,8 @@ def run_comparison(dry_path: Path, wet_path: Path, my_model_path: Path):
     # 1. RUN YOUR MODEL (InverseFXNet)
     # -------------------------------------------------------------
     print("\n[MODEL 1: YOUR MODEL (InverseFXNet - ResNet)]")
-    my_ckpt = torch.load(my_model_path, map_location="cpu")
     my_model = InverseFXNet()
-    my_model.load_state_dict(my_ckpt["model_state_dict"])
+    my_model.load_checkpoint(my_model_path)  # schema-v2 only; legacy checkpoints raise IncompatibleCheckpointError
     my_model.eval()
 
     t0 = time.perf_counter()

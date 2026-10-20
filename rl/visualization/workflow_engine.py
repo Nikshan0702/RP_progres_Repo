@@ -29,7 +29,7 @@ import torch
 from dapn.dapn import DAPN
 from dataset.dapn_dataset import PARAM_SCHEMA, SUPPORTED_EFFECTS
 from common.audio_pair import prepare_audio_pair
-from common.checkpoint import describe
+from common.checkpoint import describe, load_checkpoint
 from rl.grrl_agent import GRRLAgent
 from rl.grrl_env import BACKTRACK_ACTION_IDX, EFFECT_ACTIONS, GRRLEnv, NUM_EFFECT_ACTIONS, STOP_ACTION_IDX, improvement_percent
 from rl.visualization.audio_utils import (
@@ -146,25 +146,35 @@ class WorkflowEngine:
             predictor_path = str(self.predictor_ckpt)
         else:
             self.predictor_error = f"predictor checkpoint not found: {self.predictor_ckpt}"
+        cfg = {}
+        if self.grrl_ckpt and self.grrl_ckpt.exists():
+            try:   # the environment must be built the way the policy was trained (edit mode, penalties, chain limit)
+                cfg = load_checkpoint(self.grrl_ckpt, kind="grrl", mode="eval")["config"]
+            except Exception as exc:
+                self.backend_error = f"{type(exc).__name__}: {exc}"
+                cfg = {}
+        env_kw = dict(allow_param_edits=bool(cfg.get("allow_param_edits", False)), edit_range=float(cfg.get("edit_range", 0.25)))
         try:
             try:
-                self.env = GRRLEnv(predictor_checkpoint=predictor_path, device=str(self.device),
+                self.env = GRRLEnv(predictor_checkpoint=predictor_path, device=str(self.device), **env_kw,
                                    max_chain_length=DEFAULT_MAX_CHAIN_LENGTH, step_penalty=DEFAULT_STEP_PENALTY,
                                    target_threshold_loss=DEFAULT_TARGET_LOSS_THRESHOLD, sample_rate=DEFAULT_SAMPLE_RATE,
                                    audio_duration_sec=DEFAULT_AUDIO_DURATION)
                 self.predictor_available = predictor_path is not None
             except Exception as exc:  # incompatible/legacy predictor: cold-start still possible
                 self.predictor_error = f"{type(exc).__name__}: {exc}"
-                self.env = GRRLEnv(predictor_checkpoint=None, device=str(self.device), max_chain_length=DEFAULT_MAX_CHAIN_LENGTH,
+                self.env = GRRLEnv(predictor_checkpoint=None, device=str(self.device), **env_kw, max_chain_length=DEFAULT_MAX_CHAIN_LENGTH,
                                    step_penalty=DEFAULT_STEP_PENALTY, target_threshold_loss=DEFAULT_TARGET_LOSS_THRESHOLD,
                                    sample_rate=DEFAULT_SAMPLE_RATE, audio_duration_sec=DEFAULT_AUDIO_DURATION)
                 self.predictor_available = False
             self.agent = GRRLAgent(obs_dim=self.env.obs_dim, num_actions=self.env.num_actions, device=str(self.device))
+            if self.backend_error:     # checkpoint was unreadable/incompatible (recorded above)
+                return False
             if not (self.grrl_ckpt and self.grrl_ckpt.exists()):
                 self.backend_error = f"GRRL checkpoint not found: {self.grrl_ckpt}"
                 return False
             ckpt = self.agent.load(self.grrl_ckpt, mode="eval")
-            self.agent_config = {k: ckpt["config"].get(k) for k in ("warm_start", "max_chain_length", "max_episode_steps", "synthetic_smoke", "seed")}
+            self.agent_config = {k: ckpt["config"].get(k) for k in ("warm_start", "max_chain_length", "max_episode_steps", "synthetic_smoke", "seed", "allow_param_edits", "edit_range")}
             self.agent_config["selection"] = ckpt.get("selection")
             return True
         except Exception as exc:
@@ -297,15 +307,17 @@ class WorkflowEngine:
                                f"{'deterministic' if self.deterministic else 'sampled'})", action_diag)
 
         self._set_stage_status("chain", "running", "Mapping effect parameters to physical DSP specifications...")
-        param_records, removed = [], None
+        param_records, removed, is_edit = [], None, False
         if is_effect:
-            names = PARAM_SCHEMA[action_name]
-            p_dict = {names[i]: float(cont_act[i]) for i in range(len(names))}
+            # Show the knob values that will actually be committed (for an in-place edit these are the
+            # residual-updated values, not the raw policy action), with deltas vs the previous values.
+            cand, is_edit = env.candidate_chain(disc_act, cont_act)
+            p_dict = next(it["parameters"] for it in cand if it["effect"] == action_name)
             prev_p = next((it["parameters"] for it in prev_chain if it["effect"] == action_name), None)
             param_records = map_parameters_with_physical(action_name, p_dict, prev_p)
         elif is_backtrack and prev_chain:
             removed = prev_chain[-1]["effect"]
-        msg = (f"FX chain updated: +{action_name} ({len(param_records)} parameters mapped)" if is_effect
+        msg = ((f"FX chain updated: edited {action_name} in place" if is_edit else f"FX chain updated: +{action_name}") + f" ({len(param_records)} parameters mapped)" if is_effect
                else f"BACKTRACK: removing last effect ({removed})" if is_backtrack else "STOP action: finalizing FX chain")
         self._set_stage_status("chain", "completed", msg, {"parameters": param_records, "action": action_name, "removed": removed})
 
@@ -353,7 +365,7 @@ class WorkflowEngine:
                                    {"next_step": step_no + 1, "is_terminal": False})
 
         self.steps_history.append({
-            "step": step_no, "action": action_name, "is_stop": is_stop, "is_backtrack": is_backtrack, "removed_effect": removed,
+            "step": step_no, "action": action_name, "is_stop": is_stop, "is_backtrack": is_backtrack, "is_edit": is_edit, "removed_effect": removed,
             "discrete_action_idx": disc_act, "parameters": param_records, "log_prob": _r(log_prob),
             "prev_loss": _r(prev_loss), "current_loss": _r(self.current_loss), "delta_loss": _r(delta),
             "step_reward": _r(reward), "cumulative_reward": _r(self.cumulative_reward),

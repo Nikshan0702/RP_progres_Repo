@@ -12,6 +12,12 @@ never committed and, per ``failure_mode``:
                          info['render_failed']=True with info['error'] (state unchanged, so the
                          reported chain is always the chain that produced current_audio).
 
+Optional parameter edits (``allow_param_edits=True``, requires ``allow_repeated_effects=False``): choosing an
+effect that is ALREADY in the chain edits it in place (same position, same chain length) instead of appending.
+The policy's action a in (0,1) is a residual: new = clip(old + (a-0.5)*2*edit_range, 0, 1), so a=0.5 is "no change"
+and exploration is local around the current (e.g. predictor-supplied) knob values. Without the flag, an effect
+already in the chain is masked (the original no-repeat contract).
+
 Reward (per step, every component's sign; lower reconstruction loss is better):
   loss_improvement_reward = +10*(prev_loss - new_loss)     (+ when loss drops)
   step_penalty            = -step_penalty                  (0 for STOP)
@@ -49,15 +55,18 @@ class GRRLEnv:
     def __init__(self,predictor_checkpoint=None,device='cpu',max_chain_length=None,
                  min_chain_length=None,allow_repeated_effects=None,step_penalty=.05,
                  target_threshold_loss=.40,sample_rate=None,audio_duration_sec=2.,
-                 pta_taste_dim=16,max_episode_steps=24,length_penalty=.02,failure_mode='raise',failure_penalty=1.):
+                 pta_taste_dim=16,max_episode_steps=24,length_penalty=.02,failure_mode='raise',failure_penalty=1.,allow_param_edits=False,edit_range=.25):
         if failure_mode not in ('raise','penalty'):raise ValueError("failure_mode must be 'raise' or 'penalty'")
         self.failure_mode=failure_mode;self.failure_penalty=float(failure_penalty)
+        if not 0<edit_range<=.5:raise ValueError('edit_range must be in (0, 0.5]')
+        self.allow_param_edits=bool(allow_param_edits);self.edit_range=float(edit_range)
         self.device=torch.device(device)
         cfg=dict(load_system_config()['chain'])
         for name,value in [('max_chain_length',max_chain_length),('min_chain_length',min_chain_length),('allow_repeated_effects',allow_repeated_effects)]:
             if value is not None:cfg[name]=value
         self.max_chain_length=int(cfg['max_chain_length']);self.min_chain_length=int(cfg['min_chain_length'])
         self.allow_repeated_effects=bool(cfg['allow_repeated_effects'])
+        if self.allow_param_edits and self.allow_repeated_effects:raise ValueError('allow_param_edits is ambiguous with allow_repeated_effects (choosing an existing effect would both append and edit)')
         effective_max=self.max_chain_length if self.allow_repeated_effects else min(7,self.max_chain_length)
         if not 0<=self.min_chain_length<=effective_max or not 1<=self.max_chain_length<=8:
             raise ValueError('Invalid chain limits (maximum supported history is 8)')
@@ -105,13 +114,33 @@ class GRRLEnv:
         if self._done:return torch.zeros_like(mask)
         n=len(self.current_chain)
         mask[7]=n>=self.min_chain_length;mask[8]=n>0
-        if n>=self.max_chain_length:mask[:7]=False
-        if not self.allow_repeated_effects:
-            for step in self.current_chain:mask[SUPPORTED_EFFECTS.index(step['effect'])]=False
+        present={step['effect'] for step in self.current_chain}
+        for i,name in enumerate(SUPPORTED_EFFECTS):
+            add_ok=n<self.max_chain_length and (self.allow_repeated_effects or name not in present)
+            edit_ok=self.allow_param_edits and name in present
+            mask[i]=add_ok or edit_ok
         # Reserve enough operations to return to the configured minimum after editing.
         remaining=self.max_episode_steps-self.current_step
         if n<=self.min_chain_length and remaining<=self.min_chain_length-n+1:mask[8]=False
         return mask
+
+    def candidate_chain(self,idx,continuous_params=None):
+        """Pure function of (committed chain, action, params): the chain a step WOULD commit, plus is_edit.
+        Validates parameters; never mutates state. Used by step() and by the dashboard to display the exact
+        resulting knob values (for an edit these differ from the raw policy action)."""
+        candidate=copy.deepcopy(self.current_chain);is_edit=False
+        if idx<7:
+            effect=EFFECT_ACTIONS[idx];names=PARAM_SCHEMA[effect]
+            p=torch.full((len(names),),.5,device=self.device) if continuous_params is None else torch.as_tensor(continuous_params,device=self.device)
+            if p.ndim!=1 or len(p)<len(names) or not torch.isfinite(p).all() or ((p<0)|(p>1)).any():raise ValueError('Parameters must be finite normalized values in [0,1]')
+            slot=next((i for i,step in enumerate(candidate) if step['effect']==effect),None)
+            if slot is not None and self.allow_param_edits:
+                is_edit=True;old=candidate[slot]['parameters']
+                candidate[slot]['parameters']={name:min(1.,max(0.,old[name]+(float(p[i])-.5)*2*self.edit_range)) for i,name in enumerate(names)}
+            else:
+                candidate.append(dict(effect=effect,parameters={name:float(p[i]) for i,name in enumerate(names)}))
+        elif idx==8:candidate.pop()
+        return candidate,is_edit
 
     def step(self,discrete_action,continuous_params=None):
         if self._done:raise RuntimeError('Episode is finished or uninitialized; call reset')
@@ -119,13 +148,8 @@ class GRRLEnv:
         if raw.numel()!=1 or not torch.isfinite(raw) or float(raw)!=int(raw):raise ValueError('Action must be one integer')
         idx=int(raw)
         if not 0<=idx<9 or not self.get_action_mask()[idx]:raise ValueError(f'Invalid or masked action: {idx}')
-        prev=self.current_loss;candidate=copy.deepcopy(self.current_chain);old_len=len(candidate)
-        if idx<7:
-            effect=EFFECT_ACTIONS[idx];names=PARAM_SCHEMA[effect]
-            p=torch.full((len(names),),.5,device=self.device) if continuous_params is None else torch.as_tensor(continuous_params,device=self.device)
-            if p.ndim!=1 or len(p)<len(names) or not torch.isfinite(p).all() or ((p<0)|(p>1)).any():raise ValueError('Parameters must be finite normalized values in [0,1]')
-            candidate.append(dict(effect=effect,parameters={name:float(p[i]) for i,name in enumerate(names)}))
-        elif idx==8:candidate.pop()
+        prev=self.current_loss;old_len=len(self.current_chain)
+        candidate,is_edit=self.candidate_chain(idx,continuous_params)
         # Transactional execution: any error leaves the committed chain/audio/state intact.
         with torch.no_grad():
             if idx==7:rendered=self.current_audio;new_loss=prev
@@ -152,7 +176,7 @@ class GRRLEnv:
                   current_loss=new_loss,delta_loss=prev-new_loss,reward=reward,reward_breakdown={**components,'total_step_reward':reward},
                   improvement_pct=improvement_percent(self.start_loss,new_loss),dry_improvement_pct=improvement_percent(self.initial_loss,new_loss),
                   start_loss=self.start_loss,predictor_loss=self.predictor_loss,target_achieved=target,action_mask=self.get_action_mask(),
-                  terminated=terminated,truncated=truncated,render_failed=False)
+                  terminated=terminated,truncated=truncated,render_failed=False,is_edit=is_edit)
         return self._get_observation(),reward,terminated,truncated,info
 
     def _failed_step(self,idx,prev,exc):
@@ -167,7 +191,7 @@ class GRRLEnv:
                                         failure_penalty=reward,total_step_reward=reward),
                   improvement_pct=improvement_percent(self.start_loss,prev),dry_improvement_pct=improvement_percent(self.initial_loss,prev),
                   start_loss=self.start_loss,predictor_loss=self.predictor_loss,target_achieved=False,action_mask=self.get_action_mask(),
-                  terminated=False,truncated=truncated)
+                  terminated=False,truncated=truncated,is_edit=False)
         return self._get_observation(),reward,False,truncated,info
 
     def _get_observation(self):

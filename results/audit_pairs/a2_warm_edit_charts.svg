@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" style="background-color: #0b111e; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;">
+<defs>
+  <linearGradient id="gradCard" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#151f35"/>
+    <stop offset="100%" stop-color="#0f172a"/>
+  </linearGradient>
+</defs>
+<rect x="20" y="20" width="860" height="70" rx="10" fill="url(#gradCard)" stroke="#1e293b" stroke-width="1"/>
+<text x="40" y="52" fill="#38bdf8" font-size="18" font-weight="bold">DAPN RL Audio Synthesis — Execution Graphs</text>
+<text x="40" y="74" fill="#94a3b8" font-size="12">[REAL] predictor loss 2.5779 &#8594; 4.9863 (-93.4% vs predictor) | Dry 3.2001 | Cumulative Reward: -24.585 | Steps: 10</text>
+<rect x="20" y="105" width="860" height="52" rx="8" fill="#111c34" stroke="#1e293b" stroke-width="1"/>
+<text x="35" y="136" fill="#cbd5e1" font-size="12" font-weight="bold">FX Chain:</text>
+<rect x="110" y="117" width="95" height="28" rx="4" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="1"/>
+<text x="157" y="135" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">Dry Input</text>
+<text x="209" y="135" fill="#64748b" font-size="12" text-anchor="middle">&#8594;</text>
+<rect x="215" y="117" width="95" height="28" rx="4" fill="#6366f1" opacity="0.2" stroke="#6366f1" stroke-width="1"/>
+<text x="262" y="135" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">Distortion</text>
+<text x="314" y="135" fill="#64748b" font-size="12" text-anchor="middle">&#8594;</text>
+<rect x="320" y="117" width="95" height="28" rx="4" fill="#6366f1" opacity="0.2" stroke="#6366f1" stroke-width="1"/>
+<text x="367" y="135" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">Reverb</text>
+<text x="419" y="135" fill="#64748b" font-size="12" text-anchor="middle">&#8594;</text>
+<rect x="425" y="117" width="95" height="28" rx="4" fill="#10b981" opacity="0.2" stroke="#10b981" stroke-width="1"/>
+<text x="472" y="135" fill="#f8fafc" font-size="11" font-weight="bold" text-anchor="middle">Final Output</text>
+<rect x="20" y="175" width="420" height="390" rx="10" fill="url(#gradCard)" stroke="#1e293b" stroke-width="1"/>
+<text x="40" y="207" fill="#f8fafc" font-size="14" font-weight="bold">Multi-Resolution STFT Loss</text>
+<text x="40" y="225" fill="#94a3b8" font-size="11">Lower is better; step 0 = RL starting point</text>
+<line x1="75" y1="530.0" x2="415" y2="530.0" stroke="#334155" stroke-dasharray="2,2"/>
+<text x="67" y="534.0" fill="#64748b" font-size="10" text-anchor="end">0.0</text>
+<line x1="75" y1="460.0" x2="415" y2="460.0" stroke="#334155" stroke-dasharray="2,2"/>
+<text x="67" y="464.0" fill="#64748b" font-size="10" text-anchor="end">1.5</text>
+<line x1="75" y1="390.0" x2="415" y2="390.0" stroke="#334155" stroke-dasharray="2,2"/>
+<text x="67" y="394.0" fill="#64748b" font-size="10" text-anchor="end">3.0</text>
+<line x1="75" y1="320.0" x2="415" y2="320.0" stroke="#334155" stroke-dasharray="2,2"/>
+<text x="67" y="324.0" fill="#64748b" font-size="10" text-anchor="end">4.4</text>
+<line x1="75" y1="250.0" x2="415" y2="250.0" stroke="#334155" stroke-dasharray="2,2"/>
+<text x="67" y="254.0" fill="#64748b" font-size="10" text-anchor="end">5.9</text>
+<text x="75.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">Start</text>
+<text x="109.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S1</text>
+<text x="143.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S2</text>
+<text x="177.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S3</text>
+<text x="211.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S4</text>
+<text x="245.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S5</text>
+<text x="279.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S6</text>
+<text x="313.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S7</text>
+<text x="347.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S8</text>
+<text x="381.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S9</text>
+<text x="415.0" y="550" fill="#64748b" font-size="10" text-anchor="middle">S10</text>
+<line x1="75" y1="511.0204569902839" x2="415" y2="511.0204569902839" stroke="#ef4444" stroke-dasharray="4,4" stroke-width="1.5"/>
+<text x="411" y="506.0204569902839" fill="#ef4444" font-size="9" text-anchor="end">Target 0.40</text>
+<path d="M 75.0 407.7 L 109.0 286.5 L 143.0 308.3 L 177.0 301.3 L 211.0 306.8 L 245.0 296.5 L 279.0 301.0 L 313.0 303.9 L 347.0 300.2 L 381.0 291.2 L 415.0 293.4" fill="none" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+<circle cx="75.0" cy="407.7" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="75.0" y="399.7" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">2.58</text>
+<circle cx="109.0" cy="286.5" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="109.0" y="278.5" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">5.13</text>
+<circle cx="143.0" cy="308.3" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="143.0" y="300.3" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.67</text>
+<circle cx="177.0" cy="301.3" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="177.0" y="293.3" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.82</text>
+<circle cx="211.0" cy="306.8" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="211.0" y="298.8" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.70</text>
+<circle cx="245.0" cy="296.5" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="245.0" y="288.5" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.92</text>
+<circle cx="279.0" cy="301.0" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="279.0" y="293.0" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.83</text>
+<circle cx="313.0" cy="303.9" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="313.0" y="295.9" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.77</text>
+<circle cx="347.0" cy="300.2" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="347.0" y="292.2" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.84</text>
+<circle cx="381.0" cy="291.2" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="381.0" y="283.2" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">5.03</text>
+<circle cx="415.0" cy="293.4" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="1.5"/>
+<text x="415.0" y="285.4" fill="#cbd5e1" font-size="10" font-weight="bold" text-anchor="middle">4.99</text>
+<rect x="460" y="175" width="420" height="390" rx="10" fill="url(#gradCard)" stroke="#1e293b" stroke-width="1"/>
+<text x="480" y="207" fill="#f8fafc" font-size="14" font-weight="bold">Step &amp; Cumulative Reward</text>
+<text x="480" y="225" fill="#94a3b8" font-size="11">Green = improvement reward; Red = step penalty</text>
+<line x1="515" y1="295.8036180997708" x2="855" y2="295.8036180997708" stroke="#64748b" stroke-width="1"/>
+<text x="507" y="299.8036180997708" fill="#64748b" font-size="10" text-anchor="end">0.0</text>
+<rect x="524.4" y="295.8" width="15.3" height="195.2" rx="2" fill="#ef4444" opacity="0.85"/>
+<rect x="558.4" y="261.3" width="15.3" height="34.5" rx="2" fill="#10b981" opacity="0.85"/>
+<rect x="592.4" y="295.8" width="15.3" height="11.7" rx="2" fill="#ef4444" opacity="0.85"/>
+<rect x="626.4" y="287.2" width="15.3" height="8.6" rx="2" fill="#10b981" opacity="0.85"/>
+<rect x="660.4" y="295.8" width="15.3" height="17.0" rx="2" fill="#ef4444" opacity="0.85"/>
+<rect x="694.4" y="289.0" width="15.3" height="6.8" rx="2" fill="#10b981" opacity="0.85"/>
+<rect x="728.4" y="291.5" width="15.3" height="4.3" rx="2" fill="#10b981" opacity="0.85"/>
+<rect x="762.4" y="295.8" width="15.3" height="6.4" rx="2" fill="#ef4444" opacity="0.85"/>
+<rect x="796.4" y="295.8" width="15.3" height="14.8" rx="2" fill="#ef4444" opacity="0.85"/>
+<rect x="830.4" y="292.7" width="15.3" height="3.1" rx="2" fill="#10b981" opacity="0.85"/>
+<path d="M 532.0 491.0 L 566.0 456.5 L 600.0 468.1 L 634.0 459.6 L 668.0 476.6 L 702.0 469.7 L 736.0 465.4 L 770.0 471.8 L 804.0 486.6 L 838.0 483.5" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="532.0" cy="491.0" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="566.0" cy="456.5" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="600.0" cy="468.1" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="634.0" cy="459.6" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="668.0" cy="476.6" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="702.0" cy="469.7" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="736.0" cy="465.4" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="770.0" cy="471.8" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="804.0" cy="486.6" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+<circle cx="838.0" cy="483.5" r="4" fill="#06b6d4" stroke="#ffffff" stroke-width="1"/>
+</svg>

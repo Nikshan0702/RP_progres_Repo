@@ -1,0 +1,6 @@
+numpy==2.4.1
+pytest==9.1.1
+PyYAML==6.0.3
+soundfile==0.14.0
+torch==2.14.1
+torchaudio==2.11.0

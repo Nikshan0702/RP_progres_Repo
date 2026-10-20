@@ -1,0 +1,8 @@
+# Runtime + test dependencies actually imported by the repository.
+# Exact versions used for the verification runs are in environment.lock.txt
+# (also recorded inside every schema-v2 checkpoint under provenance.environment).
+torch>=2.2
+torchaudio>=2.2
+numpy>=1.26
+PyYAML>=6.0
+pytest>=8.0

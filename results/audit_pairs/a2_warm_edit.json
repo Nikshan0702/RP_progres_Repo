@@ -1,0 +1,808 @@
+{
+  "execution_mode": "real",
+  "requested_mode": "real",
+  "simulated": false,
+  "warm_started": true,
+  "dry_input": "audio/testFile.wav",
+  "wet_reference": "audio/test_wet_reverb_delay.wav",
+  "output_audio": "results/audit_pairs/a2_warm_edit.wav",
+  "dry_loss": 3.200115,
+  "predictor_loss": 2.577856,
+  "start_loss": 2.577856,
+  "baseline": "predictor",
+  "final_loss": 4.986334,
+  "improvement_vs_start_pct": -93.4295,
+  "improvement_vs_dry_pct": -55.8173,
+  "cumulative_reward": -24.584775,
+  "total_steps": 10,
+  "stop_reason": "time limit (10 operations) - truncated, no STOP",
+  "chain": [
+    {
+      "effect": "Distortion",
+      "parameters": {
+        "drive": 0.7047741413116455,
+        "tone": 0.1547389030456543,
+        "mix": 0.8472893834114075,
+        "output_gain": 0.8018046617507935
+      }
+    },
+    {
+      "effect": "Reverb",
+      "parameters": {
+        "room_size": 0.0744582861661911,
+        "damping": 0.947966068983078,
+        "wet_mix": 0.8250463604927063,
+        "dry_mix": 0.8425487875938416,
+        "decay": 0.07249325513839722
+      }
+    }
+  ],
+  "verification": {
+    "rerender_max_abs_diff": 0.0,
+    "rerender_loss": 4.986334,
+    "reported_loss": 4.986334,
+    "chain_matches_audio": true
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "BACKTRACK",
+      "prev_loss": 2.577856,
+      "current_loss": 5.131383,
+      "step_reward": -25.565271,
+      "reward_breakdown": {
+        "loss_improvement_reward": -25.535271167755127,
+        "step_penalty": -0.05,
+        "length_penalty": 0.02,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -25.565271167755128,
+        "prev_loss": 2.577856,
+        "current_loss": 5.131383,
+        "delta_loss": -2.553527,
+        "target_achieved": false
+      },
+      "parameters": [],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 2,
+      "action": "Reverb",
+      "prev_loss": 5.131383,
+      "current_loss": 4.672391,
+      "step_reward": 4.51992,
+      "reward_breakdown": {
+        "loss_improvement_reward": 4.5899200439453125,
+        "step_penalty": -0.05,
+        "length_penalty": -0.02,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 4.519920043945312,
+        "prev_loss": 5.131383,
+        "current_loss": 4.672391,
+        "delta_loss": 0.458992,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.4286,
+          "physical": 0.4286,
+          "unit": "dimensionless",
+          "display": "0.43",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "damping",
+          "normalized": 0.5779,
+          "physical": 0.5779,
+          "unit": "dimensionless",
+          "display": "0.58",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.5739,
+          "physical": 0.5739,
+          "unit": "dimensionless",
+          "display": "0.57",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.5709,
+          "physical": 0.5709,
+          "unit": "dimensionless",
+          "display": "0.57",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        },
+        {
+          "name": "decay",
+          "normalized": 0.4204,
+          "physical": 4.2621,
+          "unit": "s",
+          "display": "4.26 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": null,
+          "prev_physical": null,
+          "delta_normalized": 0.0
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 3,
+      "action": "Reverb",
+      "prev_loss": 4.672391,
+      "current_loss": 4.820264,
+      "step_reward": -1.528724,
+      "reward_breakdown": {
+        "loss_improvement_reward": -1.478724479675293,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -1.528724479675293,
+        "prev_loss": 4.672391,
+        "current_loss": 4.820264,
+        "delta_loss": -0.147872,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.3793,
+          "physical": 0.3793,
+          "unit": "dimensionless",
+          "display": "0.38",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.4286,
+          "prev_physical": 0.4286,
+          "delta_normalized": -0.0493
+        },
+        {
+          "name": "damping",
+          "normalized": 0.6322,
+          "physical": 0.6322,
+          "unit": "dimensionless",
+          "display": "0.63",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5779,
+          "prev_physical": 0.5779,
+          "delta_normalized": 0.0542
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.5978,
+          "physical": 0.5978,
+          "unit": "dimensionless",
+          "display": "0.60",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5739,
+          "prev_physical": 0.5739,
+          "delta_normalized": 0.0238
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.6061,
+          "physical": 0.6061,
+          "unit": "dimensionless",
+          "display": "0.61",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5709,
+          "prev_physical": 0.5709,
+          "delta_normalized": 0.0352
+        },
+        {
+          "name": "decay",
+          "normalized": 0.3739,
+          "physical": 3.8013,
+          "unit": "s",
+          "display": "3.80 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.4204,
+          "prev_physical": 4.2621,
+          "delta_normalized": -0.0465
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 4,
+      "action": "Reverb",
+      "prev_loss": 4.820264,
+      "current_loss": 4.703066,
+      "step_reward": 1.121975,
+      "reward_breakdown": {
+        "loss_improvement_reward": 1.1719751358032227,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 1.1219751358032226,
+        "prev_loss": 4.820264,
+        "current_loss": 4.703066,
+        "delta_loss": 0.117198,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.3345,
+          "physical": 0.3345,
+          "unit": "dimensionless",
+          "display": "0.33",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3793,
+          "prev_physical": 0.3793,
+          "delta_normalized": -0.0448
+        },
+        {
+          "name": "damping",
+          "normalized": 0.6807,
+          "physical": 0.6807,
+          "unit": "dimensionless",
+          "display": "0.68",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6322,
+          "prev_physical": 0.6322,
+          "delta_normalized": 0.0485
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.6259,
+          "physical": 0.6259,
+          "unit": "dimensionless",
+          "display": "0.63",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.5978,
+          "prev_physical": 0.5978,
+          "delta_normalized": 0.0282
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.6408,
+          "physical": 0.6408,
+          "unit": "dimensionless",
+          "display": "0.64",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6061,
+          "prev_physical": 0.6061,
+          "delta_normalized": 0.0348
+        },
+        {
+          "name": "decay",
+          "normalized": 0.3302,
+          "physical": 3.3695,
+          "unit": "s",
+          "display": "3.37 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.3739,
+          "prev_physical": 3.8013,
+          "delta_normalized": -0.0436
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 5,
+      "action": "Reverb",
+      "prev_loss": 4.703066,
+      "current_loss": 4.920729,
+      "step_reward": -2.226628,
+      "reward_breakdown": {
+        "loss_improvement_reward": -2.1766281127929688,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -2.2266281127929686,
+        "prev_loss": 4.703066,
+        "current_loss": 4.920729,
+        "delta_loss": -0.217663,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.2896,
+          "physical": 0.2896,
+          "unit": "dimensionless",
+          "display": "0.29",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.3345,
+          "prev_physical": 0.3345,
+          "delta_normalized": -0.0448
+        },
+        {
+          "name": "damping",
+          "normalized": 0.7283,
+          "physical": 0.7283,
+          "unit": "dimensionless",
+          "display": "0.73",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6807,
+          "prev_physical": 0.6807,
+          "delta_normalized": 0.0476
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.6562,
+          "physical": 0.6562,
+          "unit": "dimensionless",
+          "display": "0.66",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6259,
+          "prev_physical": 0.6259,
+          "delta_normalized": 0.0303
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.6753,
+          "physical": 0.6753,
+          "unit": "dimensionless",
+          "display": "0.68",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6408,
+          "prev_physical": 0.6408,
+          "delta_normalized": 0.0345
+        },
+        {
+          "name": "decay",
+          "normalized": 0.2863,
+          "physical": 2.9347,
+          "unit": "s",
+          "display": "2.93 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.3302,
+          "prev_physical": 3.3695,
+          "delta_normalized": -0.0439
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 6,
+      "action": "Reverb",
+      "prev_loss": 4.920729,
+      "current_loss": 4.826168,
+      "step_reward": 0.895616,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.9456157684326172,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.8956157684326171,
+        "prev_loss": 4.920729,
+        "current_loss": 4.826168,
+        "delta_loss": 0.094562,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.2479,
+          "physical": 0.2479,
+          "unit": "dimensionless",
+          "display": "0.25",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2896,
+          "prev_physical": 0.2896,
+          "delta_normalized": -0.0418
+        },
+        {
+          "name": "damping",
+          "normalized": 0.772,
+          "physical": 0.772,
+          "unit": "dimensionless",
+          "display": "0.77",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7283,
+          "prev_physical": 0.7283,
+          "delta_normalized": 0.0437
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.6911,
+          "physical": 0.6911,
+          "unit": "dimensionless",
+          "display": "0.69",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6562,
+          "prev_physical": 0.6562,
+          "delta_normalized": 0.0348
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.7089,
+          "physical": 0.7089,
+          "unit": "dimensionless",
+          "display": "0.71",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6753,
+          "prev_physical": 0.6753,
+          "delta_normalized": 0.0336
+        },
+        {
+          "name": "decay",
+          "normalized": 0.2436,
+          "physical": 2.5112,
+          "unit": "s",
+          "display": "2.51 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.2863,
+          "prev_physical": 2.9347,
+          "delta_normalized": -0.0428
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 7,
+      "action": "Reverb",
+      "prev_loss": 4.826168,
+      "current_loss": 4.76508,
+      "step_reward": 0.560876,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.6108760833740234,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.5608760833740234,
+        "prev_loss": 4.826168,
+        "current_loss": 4.76508,
+        "delta_loss": 0.061088,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.2041,
+          "physical": 0.2041,
+          "unit": "dimensionless",
+          "display": "0.20",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2479,
+          "prev_physical": 0.2479,
+          "delta_normalized": -0.0437
+        },
+        {
+          "name": "damping",
+          "normalized": 0.8168,
+          "physical": 0.8168,
+          "unit": "dimensionless",
+          "display": "0.82",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.772,
+          "prev_physical": 0.772,
+          "delta_normalized": 0.0448
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.7256,
+          "physical": 0.7256,
+          "unit": "dimensionless",
+          "display": "0.73",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.6911,
+          "prev_physical": 0.6911,
+          "delta_normalized": 0.0346
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.7422,
+          "physical": 0.7422,
+          "unit": "dimensionless",
+          "display": "0.74",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7089,
+          "prev_physical": 0.7089,
+          "delta_normalized": 0.0334
+        },
+        {
+          "name": "decay",
+          "normalized": 0.2,
+          "physical": 2.0798,
+          "unit": "s",
+          "display": "2.08 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.2436,
+          "prev_physical": 2.5112,
+          "delta_normalized": -0.0436
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 8,
+      "action": "Reverb",
+      "prev_loss": 4.76508,
+      "current_loss": 4.843647,
+      "step_reward": -0.835666,
+      "reward_breakdown": {
+        "loss_improvement_reward": -0.7856655120849609,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -0.835665512084961,
+        "prev_loss": 4.76508,
+        "current_loss": 4.843647,
+        "delta_loss": -0.078567,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.1593,
+          "physical": 0.1593,
+          "unit": "dimensionless",
+          "display": "0.16",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.2041,
+          "prev_physical": 0.2041,
+          "delta_normalized": -0.0448
+        },
+        {
+          "name": "damping",
+          "normalized": 0.8625,
+          "physical": 0.8625,
+          "unit": "dimensionless",
+          "display": "0.86",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.8168,
+          "prev_physical": 0.8168,
+          "delta_normalized": 0.0458
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.7569,
+          "physical": 0.7569,
+          "unit": "dimensionless",
+          "display": "0.76",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7256,
+          "prev_physical": 0.7256,
+          "delta_normalized": 0.0312
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.7762,
+          "physical": 0.7762,
+          "unit": "dimensionless",
+          "display": "0.78",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7422,
+          "prev_physical": 0.7422,
+          "delta_normalized": 0.0339
+        },
+        {
+          "name": "decay",
+          "normalized": 0.1567,
+          "physical": 1.6512,
+          "unit": "s",
+          "display": "1.65 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.2,
+          "prev_physical": 2.0798,
+          "delta_normalized": -0.0433
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 9,
+      "action": "Reverb",
+      "prev_loss": 4.843647,
+      "current_loss": 5.032254,
+      "step_reward": -1.936072,
+      "reward_breakdown": {
+        "loss_improvement_reward": -1.8860721588134766,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": -1.9360721588134766,
+        "prev_loss": 4.843647,
+        "current_loss": 5.032254,
+        "delta_loss": -0.188607,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.115,
+          "physical": 0.115,
+          "unit": "dimensionless",
+          "display": "0.11",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.1593,
+          "prev_physical": 0.1593,
+          "delta_normalized": -0.0443
+        },
+        {
+          "name": "damping",
+          "normalized": 0.9071,
+          "physical": 0.9071,
+          "unit": "dimensionless",
+          "display": "0.91",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.8625,
+          "prev_physical": 0.8625,
+          "delta_normalized": 0.0446
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.7894,
+          "physical": 0.7894,
+          "unit": "dimensionless",
+          "display": "0.79",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7569,
+          "prev_physical": 0.7569,
+          "delta_normalized": 0.0326
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.8095,
+          "physical": 0.8095,
+          "unit": "dimensionless",
+          "display": "0.81",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7762,
+          "prev_physical": 0.7762,
+          "delta_normalized": 0.0334
+        },
+        {
+          "name": "decay",
+          "normalized": 0.1138,
+          "physical": 1.2264,
+          "unit": "s",
+          "display": "1.23 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.1567,
+          "prev_physical": 1.6512,
+          "delta_normalized": -0.0429
+        }
+      ],
+      "terminated": false,
+      "truncated": false
+    },
+    {
+      "step": 10,
+      "action": "Reverb",
+      "prev_loss": 5.032254,
+      "current_loss": 4.986334,
+      "step_reward": 0.409199,
+      "reward_breakdown": {
+        "loss_improvement_reward": 0.4591989517211914,
+        "step_penalty": -0.05,
+        "length_penalty": -0.0,
+        "terminal_bonus": 0.0,
+        "total_step_reward": 0.4091989517211914,
+        "prev_loss": 5.032254,
+        "current_loss": 4.986334,
+        "delta_loss": 0.04592,
+        "target_achieved": false
+      },
+      "parameters": [
+        {
+          "name": "room_size",
+          "normalized": 0.0745,
+          "physical": 0.0745,
+          "unit": "dimensionless",
+          "display": "0.07",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.115,
+          "prev_physical": 0.115,
+          "delta_normalized": -0.0405
+        },
+        {
+          "name": "damping",
+          "normalized": 0.948,
+          "physical": 0.948,
+          "unit": "dimensionless",
+          "display": "0.95",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.9071,
+          "prev_physical": 0.9071,
+          "delta_normalized": 0.0409
+        },
+        {
+          "name": "wet_mix",
+          "normalized": 0.825,
+          "physical": 0.825,
+          "unit": "dimensionless",
+          "display": "0.83",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.7894,
+          "prev_physical": 0.7894,
+          "delta_normalized": 0.0356
+        },
+        {
+          "name": "dry_mix",
+          "normalized": 0.8425,
+          "physical": 0.8425,
+          "unit": "dimensionless",
+          "display": "0.84",
+          "min_physical": 0.0,
+          "max_physical": 1.0,
+          "prev_normalized": 0.8095,
+          "prev_physical": 0.8095,
+          "delta_normalized": 0.033
+        },
+        {
+          "name": "decay",
+          "normalized": 0.0725,
+          "physical": 0.8177,
+          "unit": "s",
+          "display": "0.82 s",
+          "min_physical": 0.1,
+          "max_physical": 10.0,
+          "prev_normalized": 0.1138,
+          "prev_physical": 1.2264,
+          "delta_normalized": -0.0413
+        }
+      ],
+      "terminated": false,
+      "truncated": true
+    }
+  ],
+  "runtime_sec": 0.279
+}

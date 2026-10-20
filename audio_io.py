@@ -152,6 +152,8 @@ def load_audio(
     dur_s = waveform.shape[-1] / target_sr
     max_dur = get_max_duration_seconds()
     if dur_s > max_dur:
+        # system limit (config/system_config.yaml: audio.max_duration_seconds); never silent
+        logger.warning("'%s' is %.2f s; truncating to the configured system limit of %.1f s", path.name, dur_s, max_dur)
         waveform = waveform[..., :int(max_dur * target_sr)]
 
     logger.info("Loaded '%s' — shape=%s, sr=%d", path.name, tuple(waveform.shape), target_sr)

@@ -111,7 +111,8 @@ def assert_disjoint(train: DAPNSyntheticDataset, val: DAPNSyntheticDataset) -> N
 def build_env(args, **kw) -> GRRLEnv:
     return GRRLEnv(predictor_checkpoint=args.predictor_checkpoint if (args.use_warm_start or args.predictor_checkpoint) else None,
                    device=args.device, max_chain_length=args.max_chain_length, step_penalty=args.step_penalty,
-                   max_episode_steps=args.max_episode_steps, sample_rate=44100, audio_duration_sec=2.0, **kw)
+                   max_episode_steps=args.max_episode_steps, sample_rate=44100, audio_duration_sec=2.0,
+                   allow_param_edits=args.allow_param_edits, edit_range=args.edit_range, **kw)
 
 
 def run_validation(eval_env, agent, val_pairs, args, step: int, out_dir: Path) -> dict:
@@ -157,6 +158,7 @@ def train(args: argparse.Namespace) -> dict:
     n_term = n_trunc = n_stop = n_fail = 0
     extra_cfg = {"warm_start": args.use_warm_start, "max_chain_length": args.max_chain_length,
                  "max_episode_steps": args.max_episode_steps, "step_penalty": args.step_penalty,
+                 "allow_param_edits": args.allow_param_edits, "edit_range": args.edit_range,
                  "predictor_checkpoint": args.predictor_checkpoint, "synthetic_smoke": synthetic,
                  "gamma": args.gamma, "gae_lambda": args.gae_lambda, "seed": args.seed}
     provenance = {"datasets": dataset_provenance(args.train_metadata, args.val_metadata), "args": vars(args)}
@@ -168,6 +170,10 @@ def train(args: argparse.Namespace) -> dict:
 
     if args.resume:
         ck = agent.load(args.resume, mode="resume")   # FileNotFoundError if missing; Incompatible* if wrong arch
+        for k in ("allow_param_edits", "edit_range", "warm_start"):
+            want = {"allow_param_edits": args.allow_param_edits, "edit_range": args.edit_range, "warm_start": args.use_warm_start}[k]
+            if ck["config"].get(k, False if k != "edit_range" else 0.25) != want:
+                raise SystemExit(f"Cannot resume: checkpoint config {k}={ck['config'].get(k)!r} differs from requested {want!r}")
         pr = ck["progress"]
         step_count, update_count, episode_count, next_eval = pr["timesteps"], pr["updates"], pr["episodes"], pr["next_eval"]
         sampler.load(pr["sampler"])
@@ -259,6 +265,8 @@ def build_parser() -> argparse.ArgumentParser:
     a("--gae-lambda", type=float, default=0.95); a("--max-chain-length", type=int, default=8)
     a("--max-episode-steps", type=int, default=24); a("--step-penalty", type=float, default=0.05)
     a("--use-warm-start", action="store_true"); a("--predictor-checkpoint", default=None)
+    a("--allow-param-edits", action="store_true", help="choosing an effect already in the chain edits its knobs in place (residual, see GRRLEnv)")
+    a("--edit-range", type=float, default=0.25)
     a("--eval-freq", type=int, default=200); a("--eval-episodes", type=int, default=5)
     a("--train-metadata", default="dataset/synthetic/train/metadata.jsonl")
     a("--val-metadata", default="dataset/synthetic/val/metadata.jsonl")

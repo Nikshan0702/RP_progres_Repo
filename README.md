@@ -285,3 +285,27 @@ Phase C: GRRL-Agent (FUTURE)
 Phase D: Human-in-the-Loop Personalisation & PTA (FUTURE)
    └── Preference learning, pairwise feedback, and explainability (XAI).
 ```
+
+---
+
+## 9. Research pipeline status (post-repair)
+
+The DSP, predictor, RL, training, checkpoint and dashboard layers were audited and repaired on branch
+`repair/research-grade`. Start here:
+
+* `docs/DATASET_MIGRATION.md` — the shipped wet audio was rendered by the *old* DSP; migration procedure and evidence.
+* `docs/RL_DESIGN.md` — reward components/signs, action contract, bounded Beta policy, warm start, isolation, checkpoints.
+* Legacy `checkpoints/` files are **schema-incompatible** (no order decoder, Gaussian-era policy) and are never loaded;
+  new checkpoints are written to `checkpoints_v2/` (`common/checkpoint.py`, schema v2).
+
+```bash
+pip install -r requirements.txt            # exact versions used for verification: environment.lock.txt
+python -m pytest -q                         # full regression suite
+python -m dataset.migrate_to_current_dsp ...  # see docs/DATASET_MIGRATION.md
+python train.py --train_metadata <train> --val_metadata <valsel> --save_dir checkpoints_v2        # ordered predictor
+python -m rl.train_grrl --use-warm-start --predictor-checkpoint checkpoints_v2/best_model.pth ... # GRRL (warm)
+python -m rl.train_grrl ...                                                                       # GRRL (cold)
+python -m rl.train_ppo --predictor-checkpoint checkpoints_v2/best_model.pth ...                   # fixed-slot baseline
+python -m rl.evaluate_protocol --test-metadata <test> --train-metadata <train> ...                # held-out comparison
+python rl/visualize.py --mode real                                                                # dashboard (fails if no v2 checkpoint)
+```

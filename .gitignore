@@ -124,3 +124,14 @@ tmp/
 # Whitelist small test audio files needed for repository tests
 !audio/dry.wav
 !audio/wet.wav
+
+# ============================================================
+# Repair-branch artifacts (large / regenerable)
+# ============================================================
+checkpoints_v2/
+checkpoints_v2_smoke/
+dataset/synthetic_v2/
+dataset/synthetic_v2_smoke/
+dataset/_pytest_migration/
+results/**/*.wav
+rl/visualization/temp/
