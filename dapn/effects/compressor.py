@@ -94,46 +94,55 @@ class Compressor(BaseEffect):
         release_ms    = self.map_to_physical("release",      parameters["release"])
         makeup_db     = self.map_to_physical("makeup_gain",  parameters["makeup_gain"])
 
-        # ---- Time constants (samples) ----------------------------------------
+        # ---- Time constants --------------------------------------------------
         attack_time_s  = attack_ms  * 1e-3
         release_time_s = release_ms * 1e-3
         ln9 = math.log(9.0)
 
-        attack_coeff  = torch.exp(-torch.tensor(ln9, dtype=audio_3d.dtype) / (attack_time_s  * sr + _EPS))
-        release_coeff = torch.exp(-torch.tensor(ln9, dtype=audio_3d.dtype) / (release_time_s * sr + _EPS))
+        # ---- Level detection & Gain computation (per frame) ------------------
+        x_sq = audio_3d.pow(2)
+        frame_size = 16
+        if T < frame_size:
+            frame_size = max(1, T)
 
-        # ---- Level detection: RMS via exponential smoothing ------------------
-        # |x|^2 smoothed with attack coefficient; then sqrt
-        x_sq = audio_3d.pow(2)          # (B, C, T)
-
-        # Use a causal 1-D exponential moving average approximation via conv.
-        # For simplicity: compute instantaneous RMS in short frames (32 samples)
-        # and smooth. This avoids the non-differentiable sequential loop.
-        frame_size = 32
-        # Pad to make divisible
         pad_right = (frame_size - T % frame_size) % frame_size
         x_sq_pad  = F.pad(x_sq, (0, pad_right))
         T_pad = x_sq_pad.shape[-1]
-        # Frame mean → (B, C, T_pad/frame_size)
-        frames = x_sq_pad.view(B, C, T_pad // frame_size, frame_size).mean(dim=-1)
-        # Upsample back to T via repeat_interleave
-        level_sq = frames.repeat_interleave(frame_size, dim=-1)[..., :T]  # (B, C, T)
-        level_linear = torch.sqrt(level_sq + _EPS)                         # RMS level
+        N = T_pad // frame_size
+        frames = x_sq_pad.view(B, C, N, frame_size).mean(dim=-1)
+        level_linear = torch.sqrt(frames + _EPS)
 
-        # ---- Gain computation in dB (soft-knee) --------------------------------
+        # ---- Gain computation in dB (soft-knee) ------------------------------
         level_db = 20.0 * torch.log10(level_linear + _EPS)
-
         knee = _KNEE_DB
-        # Soft-knee gain reduction (dB) using smooth hinge
-        # GR = (1/ratio - 1) * softplus(level_db - threshold_db) scaled by knee
         x_over  = level_db - threshold_db  # positive when above threshold
-        # Soft knee: use sigmoid interpolation
         knee_factor = torch.sigmoid((x_over + knee / 2.0) / (knee / 4.0 + _EPS))
-        gr_db = (1.0 / ratio - 1.0) * F.softplus(x_over) * knee_factor
+        gr_target_db = (1.0 / ratio - 1.0) * F.softplus(x_over) * knee_factor
+
+        # ---- Ballistics smoothing across frames ------------------------------
+        sr_frame = sr / frame_size
+        attack_coeff  = torch.exp(-torch.tensor(ln9, dtype=audio_3d.dtype, device=audio_3d.device) / (attack_time_s  * sr_frame + _EPS))
+        release_coeff = torch.exp(-torch.tensor(ln9, dtype=audio_3d.dtype, device=audio_3d.device) / (release_time_s * sr_frame + _EPS))
+
+        # Recurrent gain smoothing: attack when compression deepens, release when it recovers
+        g = torch.zeros(B, C, dtype=audio_3d.dtype, device=audio_3d.device)
+        gs = []
+        for i in range(N):
+            target = gr_target_db[..., i]
+            coeff = torch.where(target < g, attack_coeff, release_coeff)
+            g = coeff * g + (1.0 - coeff) * target
+            gs.append(g)
+        g_frames = torch.stack(gs, dim=-1)
+
+        # Upsample gain curve back to audio length
+        if N > 1:
+            g_up = F.interpolate(g_frames, size=T_pad, mode="linear", align_corners=False)[..., :T]
+        else:
+            g_up = g_frames.repeat_interleave(T_pad, dim=-1)[..., :T]
 
         # ---- Convert GR to linear and apply ----------------------------------
-        makeup_linear = torch.pow(torch.tensor(10.0, dtype=audio_3d.dtype), makeup_db / 20.0)
-        gr_linear     = torch.pow(torch.tensor(10.0, dtype=audio_3d.dtype), gr_db / 20.0)
+        makeup_linear = torch.pow(torch.tensor(10.0, dtype=audio_3d.dtype, device=audio_3d.device), makeup_db / 20.0)
+        gr_linear     = torch.pow(torch.tensor(10.0, dtype=audio_3d.dtype, device=audio_3d.device), g_up / 20.0)
 
         out = audio_3d * gr_linear * makeup_linear
 

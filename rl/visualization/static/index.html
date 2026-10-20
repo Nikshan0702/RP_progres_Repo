@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DAPN RL Audio Synthesis Studio</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Header -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-icon">🎛️</div>
+        <div>
+          <h1 class="brand-title">DAPN <span class="accent-text">RL Studio</span></h1>
+          <p class="brand-subtitle">Sequential Graph-Generating Reinforcement Learning (GRRL) Audio Synthesis</p>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <!-- Preset Dropdown -->
+        <div class="control-group">
+          <label for="preset-select" class="control-label">Audio Pair:</label>
+          <select id="preset-select" class="dropdown-input">
+            <option value="lead_guitar">Preset 1: Synth/Guitar Lead (0.5s)</option>
+            <option value="acoustic_reverb">Preset 2: Acoustic Clean + Reverb/Delay</option>
+            <option value="acoustic_rock">Preset 3: Acoustic Clean + Target Rock Tone</option>
+            <option value="custom">Upload Custom WAV Pair...</option>
+          </select>
+        </div>
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle-group">
+          <button id="btn-mode-real" class="mode-btn active" title="Run real PyTorch DAPN DSP pipeline with trained GRRL checkpoint">
+            <span class="status-dot green"></span> Real RL Mode
+          </button>
+          <button id="btn-mode-demo" class="mode-btn" title="Run simulated demo progression for quick UI inspection">
+            <span class="status-dot amber"></span> Demo Mode
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="btn-group">
+          <button id="btn-step" class="action-btn secondary" title="Execute one single step forward">
+            <span class="btn-icon">⏭️</span> Step Forward
+          </button>
+          <button id="btn-run-all" class="action-btn primary" title="Run full workflow to completion">
+            <span class="btn-icon">▶️</span> Run Full Workflow
+          </button>
+          <button id="btn-reset" class="action-btn ghost" title="Reset episode">
+            <span class="btn-icon">↺</span> Reset
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Execution Mode Banner -->
+    <div id="mode-banner" class="mode-banner real">
+      <div class="banner-content">
+        <span class="banner-badge" id="banner-badge">REAL RL POLICY</span>
+        <span id="banner-text">
+          Executing PyTorch Differentiable Audio Processing Network (DAPN) with trained GRRL checkpoint (<code>checkpoints/grrl/best_grrl_model.pth</code>) and Multi-Resolution STFT Loss.
+        </span>
+      </div>
+      <div class="banner-meta">
+        <span class="meta-tag">Device: <b id="meta-device">CPU</b></span>
+        <span class="meta-tag">Step Penalty: <b>0.05</b></span>
+        <span class="meta-tag">Target Loss: <b>&le; 0.40</b></span>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <main class="main-content">
+      <!-- Section 1: Complete Workflow Progression Ribbon (Requirement 2) -->
+      <section class="card workflow-card">
+        <div class="card-header">
+          <div class="header-left">
+            <h2 class="card-title">1. Complete Processing Workflow</h2>
+            <span class="card-hint">Live 11-stage pipeline tracking pending, running, completed, and failed status</span>
+          </div>
+          <div class="stage-legend">
+            <span class="legend-item"><span class="badge pending"></span> Pending</span>
+            <span class="legend-item"><span class="badge running"></span> Running</span>
+            <span class="legend-item"><span class="badge completed"></span> Completed</span>
+            <span class="legend-item"><span class="badge failed"></span> Failed</span>
+          </div>
+        </div>
+
+        <div class="workflow-ribbon-container">
+          <div class="workflow-ribbon" id="workflow-ribbon">
+            <!-- Stages generated dynamically by JS -->
+          </div>
+        </div>
+
+        <div id="stage-detail-callout" class="stage-detail-callout">
+          <div class="callout-header">
+            <span class="callout-icon" id="callout-icon">ℹ️</span>
+            <span class="callout-title" id="callout-title">Active Stage Details</span>
+            <span class="callout-status-pill" id="callout-status">Completed</span>
+          </div>
+          <p class="callout-message" id="callout-message">Select a stage node to inspect its specific diagnostic metrics.</p>
+        </div>
+      </section>
+
+      <!-- KPI Summary Ribbon -->
+      <section class="kpi-ribbon">
+        <div class="kpi-card">
+          <span class="kpi-label">Initial Loss (Dry)</span>
+          <span class="kpi-value" id="kpi-initial-loss">--</span>
+          <span class="kpi-sub">Baseline STFT Distance</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Current / Final Loss</span>
+          <span class="kpi-value" id="kpi-current-loss">--</span>
+          <span class="kpi-sub" id="kpi-delta-loss">Δ 0.0000</span>
+        </div>
+        <div class="kpi-card highlight">
+          <span class="kpi-label">Loss Improvement</span>
+          <span class="kpi-value accent" id="kpi-improvement">--%</span>
+          <span class="kpi-sub" id="kpi-threshold-status">Target: &le; 0.40</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Cumulative Reward</span>
+          <span class="kpi-value" id="kpi-reward">--</span>
+          <span class="kpi-sub">Total Episode Return</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Chain Length</span>
+          <span class="kpi-value" id="kpi-chain-len">0 / 8</span>
+          <span class="kpi-sub" id="kpi-step-count">Step 0</span>
+        </div>
+      </section>
+
+      <!-- Section 2: Action Chain Graph & Parameter Changes (Requirement 3 - Main Focus) -->
+      <section class="card action-graph-card">
+        <div class="card-header">
+          <div class="header-left">
+            <h2 class="card-title">2. RL Action Graph & Effect Chain Sequence</h2>
+            <span class="card-hint">Ordered sequence of RL decisions showing effect categories, parameter shifts, and physical DSP values</span>
+          </div>
+          <div class="header-actions">
+            <span class="tag" id="chain-status-tag">Chain Empty</span>
+          </div>
+        </div>
+
+        <div class="action-chain-scroll">
+          <div class="action-chain-flow" id="action-chain-flow">
+            <!-- Node: Dry Input -->
+            <div class="chain-node start-node">
+              <div class="node-badge">INPUT</div>
+              <div class="node-icon">🎵</div>
+              <div class="node-name">Dry Audio</div>
+              <div class="node-meta">Raw Unprocessed</div>
+            </div>
+            <!-- Dynamic effect nodes will be inserted here -->
+            <div class="chain-placeholder" id="chain-placeholder">
+              <span>No actions executed yet. Click "Step Forward" or "Run Full Workflow" to synthesize.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Charts: Loss, Reward & Parameter Trajectories (Requirement 4 - Main Focus) -->
+      <section class="charts-grid">
+        <!-- Loss Chart Card -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div class="header-left">
+              <h3 class="card-title">Audio Loss Trajectory (MR-STFT)</h3>
+              <span class="card-hint">Multi-Resolution STFT spectral distance vs step iterations</span>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-line loss"></span> Actual Loss
+              <span class="legend-line baseline"></span> Baseline
+              <span class="legend-line target"></span> Target Threshold (0.40)
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <svg id="loss-chart" class="svg-chart" viewBox="0 0 600 240"></svg>
+            <div id="loss-tooltip" class="chart-tooltip hidden"></div>
+          </div>
+        </div>
+
+        <!-- Reward Chart Card -->
+        <div class="card chart-card">
+          <div class="card-header">
+            <div class="header-left">
+              <h3 class="card-title">RL Reward Progression</h3>
+              <span class="card-hint">Step reward (Δ Loss &times; 10 - Penalty) and cumulative return</span>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-bar positive"></span> +Step Reward
+              <span class="legend-bar negative"></span> -Penalty
+              <span class="legend-line cumulative"></span> Cumulative Return
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <svg id="reward-chart" class="svg-chart" viewBox="0 0 600 240"></svg>
+            <div id="reward-tooltip" class="chart-tooltip hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Audio Comparison Studio & Waveform Visualizers (Requirement 5) -->
+      <section class="card audio-studio-card">
+        <div class="card-header">
+          <div class="header-left">
+            <h2 class="card-title">3. Audio Studio & A/B/C Comparison</h2>
+            <span class="card-hint">Interactive waveforms, synchronized playback, and direct output download</span>
+          </div>
+          <div class="studio-global-controls">
+            <button id="btn-global-play" class="action-btn secondary small">
+              <span id="global-play-icon">▶</span> Play All Synced
+            </button>
+            <button id="btn-download-output" class="action-btn primary small" disabled>
+              <span>⬇</span> Download Generated Output WAV
+            </button>
+          </div>
+        </div>
+
+        <div class="audio-tracks-grid">
+          <!-- Track 1: Dry Input -->
+          <div class="audio-track-card" id="track-dry">
+            <div class="track-header">
+              <div class="track-info">
+                <span class="track-badge dry">DRY INPUT</span>
+                <span class="track-filename" id="dry-filename">dry.wav</span>
+              </div>
+              <div class="track-actions">
+                <button class="track-play-btn" data-track="dry" title="Play/Pause Dry Audio">▶</button>
+              </div>
+            </div>
+            <div class="waveform-container">
+              <canvas id="waveform-dry" class="waveform-canvas" width="600" height="80"></canvas>
+              <div class="playhead" id="playhead-dry"></div>
+            </div>
+            <div class="track-footer">
+              <span class="time-display" id="time-dry">00:00.0 / 00:00.0</span>
+              <span class="metric-chip" id="metrics-dry">44.1kHz • Mono</span>
+            </div>
+          </div>
+
+          <!-- Track 2: Wet Reference Target -->
+          <div class="audio-track-card" id="track-wet">
+            <div class="track-header">
+              <div class="track-info">
+                <span class="track-badge wet">TARGET REFERENCE</span>
+                <span class="track-filename" id="wet-filename">wet.wav</span>
+              </div>
+              <div class="track-actions">
+                <button class="track-play-btn" data-track="wet" title="Play/Pause Wet Target Audio">▶</button>
+              </div>
+            </div>
+            <div class="waveform-container">
+              <canvas id="waveform-wet" class="waveform-canvas" width="600" height="80"></canvas>
+              <div class="playhead" id="playhead-wet"></div>
+            </div>
+            <div class="track-footer">
+              <span class="time-display" id="time-wet">00:00.0 / 00:00.0</span>
+              <span class="metric-chip" id="metrics-wet">44.1kHz • Mono</span>
+            </div>
+          </div>
+
+          <!-- Track 3: RL Generated Output -->
+          <div class="audio-track-card highlight" id="track-output">
+            <div class="track-header">
+              <div class="track-info">
+                <span class="track-badge output">RL GENERATED OUTPUT</span>
+                <span class="track-filename" id="output-filename">dapn_synthesized.wav</span>
+              </div>
+              <div class="track-actions">
+                <button class="track-play-btn" data-track="output" title="Play/Pause Synthesized Audio" disabled>▶</button>
+              </div>
+            </div>
+            <div class="waveform-container">
+              <canvas id="waveform-output" class="waveform-canvas" width="600" height="80"></canvas>
+              <div class="playhead" id="playhead-output"></div>
+            </div>
+            <div class="track-footer">
+              <span class="time-display" id="time-output">00:00.0 / 00:00.0</span>
+              <span class="metric-chip" id="metrics-output">Awaiting synthesis</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Deep Diagnostic Inspector (Tabs) -->
+      <section class="card inspector-card">
+        <div class="inspector-tabs">
+          <button class="tab-btn active" data-tab="tab-policy">Policy & Action Probabilities</button>
+          <button class="tab-btn" data-tab="tab-state">RL State Observation (148-D)</button>
+          <button class="tab-btn" data-tab="tab-rewards">Reward Breakdown</button>
+          <button class="tab-btn" data-tab="tab-json">DAPN FX Chain JSON</button>
+        </div>
+
+        <div class="tab-content active" id="tab-policy">
+          <div class="tab-description">
+            Discrete policy action distribution $P(\text{effect} \mid s)$ over all 8 action categories. Masked actions are barred by sequential syntax constraints.
+          </div>
+          <div class="action-distribution-bars" id="action-distribution-bars">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-state">
+          <div class="tab-description">
+            Observation vector decomposition: Acoustic STFT spectral distance (64), Ordered chain history matrix (64), Progress metrics (4), and PTA taste conditioning (16).
+          </div>
+          <div class="state-vector-grid">
+            <div class="state-subcard">
+              <h4>Acoustic Distance Embedding (64 STFT Bins)</h4>
+              <div class="spectral-bins-visualizer" id="spectral-bins-vis"></div>
+            </div>
+            <div class="state-subcard">
+              <h4>Ordered Chain History Slots (8 &times; 8 classes)</h4>
+              <div class="history-slots-list" id="history-slots-list"></div>
+            </div>
+            <div class="state-subcard">
+              <h4>Progress & Loss Metrics (4 dims)</h4>
+              <div class="metrics-list" id="progress-metrics-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-rewards">
+          <div class="tab-description">
+            Step reward decomposition: $\text{Reward} = 10 \cdot \Delta L - \text{Step Penalty} - \text{Mask Penalty} + \text{Terminal Bonus}$.
+          </div>
+          <div class="reward-table-wrapper" id="reward-table-wrapper">
+            <!-- Table generated by JS -->
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-json">
+          <div class="tab-header-flex">
+            <span class="tab-description">
+              Final accumulated FX chain in standard DAPN JSON schema. Direct input to <code>dapn.process(dry, chain_dict)</code>.
+            </span>
+            <button id="btn-copy-json" class="action-btn ghost small">📋 Copy JSON</button>
+          </div>
+          <pre class="json-code-block"><code id="json-code">{\n  "chain": []\n}</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <!-- Upload Modal -->
+    <div id="upload-modal" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="modal-title">Upload Custom Audio Pair</h3>
+          <button id="btn-modal-close" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">
+            Select a clean 16-bit or 32-bit float WAV pair (Dry input + Wet reference). Audio will be automatically resampled to 44.1 kHz mono.
+          </p>
+          <div class="upload-dropzone" id="drop-dry">
+            <span class="dropzone-icon">🎙️</span>
+            <div class="dropzone-text">
+              <b>Select Dry Audio File (WAV)</b>
+              <span id="dry-upload-label">No file selected</span>
+            </div>
+            <input type="file" id="input-file-dry" accept=".wav" class="file-input">
+          </div>
+          <div class="upload-dropzone" id="drop-wet">
+            <span class="dropzone-icon">🎧</span>
+            <div class="dropzone-text">
+              <b>Select Wet Reference File (WAV)</b>
+              <span id="wet-upload-label">No file selected</span>
+            </div>
+            <input type="file" id="input-file-wet" accept=".wav" class="file-input">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-modal-cancel" class="action-btn ghost">Cancel</button>
+          <button id="btn-modal-submit" class="action-btn primary" disabled>Upload & Initialize</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Native Audio Elements -->
+    <audio id="audio-player-dry" preload="auto"></audio>
+    <audio id="audio-player-wet" preload="auto"></audio>
+    <audio id="audio-player-output" preload="auto"></audio>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

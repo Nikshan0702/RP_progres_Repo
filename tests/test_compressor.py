@@ -106,3 +106,61 @@ def test_gradient_makeup_gain(comp):
     out.pow(2).mean().backward()
     assert p["makeup_gain"].grad is not None
     assert torch.isfinite(p["makeup_gain"].grad)
+
+
+def test_attack_changes_output(comp):
+    """Different attack settings produce different audio on dynamic transients."""
+    t = torch.linspace(0, 0.5, 22050)
+    audio = torch.zeros(1, 22050)
+    audio[0, 1000:5000] = 0.9 * torch.sin(2 * 3.14159 * 500 * t[:4000])
+    p_fast = _params(threshold=0.5, ratio=0.6, attack=0.01, release=0.3, makeup_gain=0.0)
+    p_slow = _params(threshold=0.5, ratio=0.6, attack=0.90, release=0.3, makeup_gain=0.0)
+
+    out_fast = comp(audio, p_fast)
+    out_slow = comp(audio, p_slow)
+    diff = (out_fast - out_slow).abs().max().item()
+    assert diff > 1e-3, f"Expected attack to alter output, max diff was {diff}"
+
+
+def test_release_changes_output(comp):
+    """Different release settings produce different audio after transients drop."""
+    t = torch.linspace(0, 0.5, 22050)
+    audio = torch.zeros(1, 22050)
+    audio[0, 1000:5000] = 0.9 * torch.sin(2 * 3.14159 * 500 * t[:4000])
+    audio[0, 5000:10000] = 0.3 * torch.sin(2 * 3.14159 * 500 * t[:5000])
+    p_fast = _params(threshold=0.5, ratio=0.6, attack=0.1, release=0.02, makeup_gain=0.0)
+    p_slow = _params(threshold=0.5, ratio=0.6, attack=0.1, release=0.90, makeup_gain=0.0)
+
+    out_fast = comp(audio, p_fast)
+    out_slow = comp(audio, p_slow)
+    diff = (out_fast - out_slow).abs().max().item()
+    assert diff > 1e-3, f"Expected release to alter output, max diff was {diff}"
+
+
+def test_gradient_attack(comp):
+    """Gradient w.r.t. attack must be finite and non-zero on dynamic audio."""
+    t = torch.linspace(0, 0.5, 22050)
+    audio = torch.zeros(1, 22050)
+    audio[0, 1000:5000] = 0.9 * torch.sin(2 * 3.14159 * 500 * t[:4000])
+    p = _params(threshold=0.5, ratio=0.5, makeup_gain=0.0)
+    p["attack"] = torch.tensor(0.2, requires_grad=True)
+    out = comp(audio, p)
+    out.pow(2).mean().backward()
+    assert p["attack"].grad is not None
+    assert torch.isfinite(p["attack"].grad)
+    assert p["attack"].grad.abs().item() > 0.0
+
+
+def test_gradient_release(comp):
+    """Gradient w.r.t. release must be finite and non-zero on dynamic audio."""
+    t = torch.linspace(0, 0.5, 22050)
+    audio = torch.zeros(1, 22050)
+    audio[0, 1000:5000] = 0.9 * torch.sin(2 * 3.14159 * 500 * t[:4000])
+    audio[0, 5000:10000] = 0.2 * torch.sin(2 * 3.14159 * 500 * t[:5000])
+    p = _params(threshold=0.5, ratio=0.5, makeup_gain=0.0)
+    p["release"] = torch.tensor(0.3, requires_grad=True)
+    out = comp(audio, p)
+    out.pow(2).mean().backward()
+    assert p["release"].grad is not None
+    assert torch.isfinite(p["release"].grad)
+    assert p["release"].grad.abs().item() > 0.0

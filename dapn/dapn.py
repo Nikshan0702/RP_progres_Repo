@@ -69,11 +69,13 @@ class DAPN(nn.Module):
         self,
         effects_config_path: Path | None = None,
         system_config_path: Path | None = None,
+        chain_config: dict | None = None,
     ) -> None:
         super().__init__()
         self._validator = FXChainValidator(
             effects_config_path=effects_config_path,
             system_config_path=system_config_path,
+            chain_config=chain_config,
         )
         self._sample_rate: int = get_sample_rate()
         logger.info("DAPN initialised (sr=%d Hz)", self._sample_rate)

@@ -5,9 +5,8 @@ Differentiable Parametric Equalizer effect.
 
 DSP model
 ---------
-Implements a **biquad peaking-EQ filter** applied in the time domain via
-``torch.nn.functional.conv1d`` with zero-phase (forward + backward pass)
-filtering.
+Implements a **biquad peaking-EQ filter** applied causally via ``torch.nn.functional.conv1d`` (cross-correlation
+requires reversing the impulse-response kernel).
 
 The biquad coefficients are computed from the EQ parameters using the
 Audio EQ Cookbook formulae (R. Bristow-Johnson).  All coefficient
@@ -121,7 +120,7 @@ class EQ(BaseEffect):
 
         # Apply via causal convolution (no padding for circular artefacts)
         # tir shape: (tir_len,) → kernel shape: (1, 1, tir_len)
-        kernel = tir.view(1, 1, -1)
+        kernel = tir.flip(0).view(1, 1, -1)  # conv1d is cross-correlation
 
         # Pad input so output length matches T
         pad_len = kernel.shape[-1] - 1

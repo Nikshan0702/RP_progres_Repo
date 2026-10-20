@@ -101,14 +101,20 @@ def load_audio(
     elif target_ch > 1 and waveform.shape[0] == 1:
         waveform = waveform.expand(target_ch, -1)
 
+    # Resample to target sample rate if needed
+    if sr != target_sr:
+        import torchaudio
+        waveform = torchaudio.functional.resample(waveform, orig_freq=sr, new_freq=target_sr)
+        logger.info("Resampled '%s' from %d Hz to %d Hz", path.name, sr, target_sr)
+
     # Check duration limit
-    dur_s = waveform.shape[-1] / sr
+    dur_s = waveform.shape[-1] / target_sr
     max_dur = get_max_duration_seconds()
     if dur_s > max_dur:
-        waveform = waveform[..., :int(max_dur * sr)]
+        waveform = waveform[..., :int(max_dur * target_sr)]
 
-    logger.info("Loaded '%s' — shape=%s, sr=%d", path.name, tuple(waveform.shape), sr)
-    return waveform, sr
+    logger.info("Loaded '%s' — shape=%s, sr=%d", path.name, tuple(waveform.shape), target_sr)
+    return waveform, target_sr
 
 
 def save_audio(
@@ -166,6 +172,7 @@ def generate_test_tone(
     amplitude: float = 0.5,
     sample_rate: int | None = None,
     channels: int | None = None,
+    duration_seconds: float | None = None,
 ) -> torch.Tensor:
     """Generate a pure sine-wave test tone.
 
@@ -174,6 +181,8 @@ def generate_test_tone(
     torch.Tensor
         Shape ``(C, T)``, dtype float32.
     """
+    if duration_seconds is not None:
+        duration_s = duration_seconds
     sr  = sample_rate or get_sample_rate()
     ch  = channels    or get_channels()
     T   = int(duration_s * sr)

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class SpectralConvergenceLoss(nn.Module):
@@ -95,6 +96,11 @@ class STFTLoss(nn.Module):
         original_shape = audio.shape
         T = original_shape[-1]
         flat_audio = audio.reshape(-1, T)
+
+        # Handle signals shorter than FFT size to prevent reflection padding crash
+        if flat_audio.shape[-1] <= self.fft_size:
+            pad_len = self.fft_size - flat_audio.shape[-1] + 1
+            flat_audio = F.pad(flat_audio, (0, pad_len))
 
         # STFT with stable complex magnitude
         stft = torch.stft(

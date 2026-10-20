@@ -4,9 +4,10 @@ tests/test_rl_env.py
 Unit tests for the Goal-Conditioned Audio Effects RL Environment (AudioFXEnv).
 """
 
+import math
+from pathlib import Path
 import pytest
 import torch
-from pathlib import Path
 from rl.dapn_env import AudioFXEnv
 
 
@@ -96,3 +97,47 @@ def test_env_truncation(dummy_audio):
 
     _, _, _, truncated, _ = env.step(action)
     assert truncated is True
+
+
+def test_env_random_actions_finite_observations_and_rewards(dummy_audio):
+    """Verify that a sequence of arbitrary continuous actions produces finite observations and rewards."""
+    dry, target = dummy_audio
+    env = AudioFXEnv(predictor_checkpoint=None, max_steps_per_episode=10)
+    obs, info = env.reset(dry, target, use_warm_start=False)
+    assert torch.isfinite(obs).all()
+    assert math.isfinite(info["current_loss"])
+
+    torch.manual_seed(123)
+    for _ in range(8):
+        action = torch.randn(36)
+        next_obs, reward, terminated, truncated, step_info = env.step(action)
+
+        assert next_obs.shape == (100,)
+        assert torch.isfinite(next_obs).all(), "Observation contains non-finite values"
+        assert math.isfinite(reward), f"Reward {reward} is not finite"
+        assert math.isfinite(step_info["current_loss"])
+        # Parameters must remain strictly in [0, 1]
+        assert (env.current_params >= 0.0).all() and (env.current_params <= 1.0).all()
+        # Presence must be 0 or 1
+        assert torch.all((env.current_presence == 0.0) | (env.current_presence == 1.0))
+        if terminated or truncated:
+            break
+
+
+def test_env_extreme_actions_clamping(dummy_audio):
+    """Extreme actions (+100, -100) are clamped gracefully without NaN."""
+    dry, target = dummy_audio
+    env = AudioFXEnv(predictor_checkpoint=None)
+    env.reset(dry, target, use_warm_start=False)
+
+    huge_positive_action = torch.full((36,), 100.0)
+    obs, reward, _, _, _ = env.step(huge_positive_action)
+    assert torch.isfinite(obs).all()
+    assert math.isfinite(reward)
+    assert torch.allclose(env.current_params, torch.ones_like(env.current_params))
+
+    huge_negative_action = torch.full((36,), -100.0)
+    obs, reward, _, _, _ = env.step(huge_negative_action)
+    assert torch.isfinite(obs).all()
+    assert math.isfinite(reward)
+    assert torch.allclose(env.current_params, torch.zeros_like(env.current_params))

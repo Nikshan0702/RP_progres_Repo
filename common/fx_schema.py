@@ -107,11 +107,13 @@ class FXChainValidator:
         self,
         effects_config_path: Path | None = None,
         system_config_path: Path | None = None,
+        chain_config: dict | None = None,
     ) -> None:
         self._effects_cfg = load_effects_config(effects_config_path)
         self._system_cfg = load_system_config(system_config_path)
 
-        chain_cfg = self._system_cfg["chain"]
+        chain_cfg = dict(self._system_cfg["chain"])
+        chain_cfg.update(chain_config or {})
         self._min_chain_length: int = int(chain_cfg["min_chain_length"])
         self._max_chain_length: int = int(chain_cfg["max_chain_length"])
         self._allow_repeated_effects: bool = bool(chain_cfg["allow_repeated_effects"])

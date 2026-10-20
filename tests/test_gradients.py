@@ -61,9 +61,10 @@ def test_compressor_all_parameters_have_gradients(dapn):
     loss = out.pow(2).mean()
     loss.backward()
 
-    for name, p in [("threshold", thresh), ("ratio", ratio), ("makeup_gain", makeup)]:
+    for name, p in [("threshold", thresh), ("ratio", ratio), ("attack", att), ("release", rel), ("makeup_gain", makeup)]:
         assert p.grad is not None, f"Compressor '{name}' grad is None"
         assert torch.isfinite(p.grad), f"Compressor '{name}' grad is not finite"
+        assert p.grad.abs().item() > 0.0, f"Compressor '{name}' grad is zero"
 
 
 def test_delay_all_parameters_have_gradients(dapn):
@@ -140,6 +141,8 @@ def test_gradient_propagates_through_entire_chain(dapn):
         ("EQ frequency",         eq_freq),
         ("EQ gain",              eq_gain),
         ("Compressor threshold", cp_thresh),
+        ("Compressor attack",    cp_att),
+        ("Compressor release",   cp_rel),
         ("Compressor makeup",    cp_makeup),
         ("Delay wet_mix",        dl_wet),
         ("Delay dry_mix",        dl_dry),

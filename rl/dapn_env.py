@@ -28,6 +28,8 @@ R_t = (Loss_{t-1} - Loss_t) * scale - lambda_sparse * N_active_effects + R_bonus
 from __future__ import annotations
 
 import copy
+import logging
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,10 @@ if str(ROOT) not in sys.path:
 import torch
 import torch.nn.functional as F
 
+logger = logging.getLogger(__name__)
+
+from common.audio_pair import prepare_audio_pair
+from common.config_loader import get_sample_rate
 from common.losses import MultiResolutionSTFTLoss
 from dapn.dapn import DAPN
 from dataset.dapn_dataset import PARAM_OFFSETS, PARAM_SCHEMA, SUPPORTED_EFFECTS
@@ -50,7 +56,7 @@ class AudioFXEnv:
 
     def __init__(
         self,
-        predictor_checkpoint: str | Path | None = "checkpoints/best_model.pth",
+        predictor_checkpoint: str | Path | None = None,
         device: str = "cpu",
         max_steps_per_episode: int = 15,
         sparsity_weight: float = 0.02,
@@ -62,7 +68,10 @@ class AudioFXEnv:
         self.max_steps = max_steps_per_episode
         self.sparsity_weight = sparsity_weight
         self.target_threshold_loss = target_threshold_loss
-        self.sample_rate = sample_rate
+        self.sample_rate = get_sample_rate()
+        if sample_rate != self.sample_rate: raise ValueError("Environment/DAPN sample rates differ")
+        self.audio_duration_sec = audio_duration_sec
+        self._done = True
         self.max_samples = int(sample_rate * audio_duration_sec)
 
         # DSP Engine and Loss Function
@@ -71,10 +80,9 @@ class AudioFXEnv:
 
         # Load warm-start predictor model if checkpoint provided
         self.predictor: InverseFXNet | None = None
-        if predictor_checkpoint and Path(predictor_checkpoint).exists():
-            ckpt = torch.load(predictor_checkpoint, map_location=self.device)
+        if predictor_checkpoint is not None:
             self.predictor = InverseFXNet().to(self.device)
-            self.predictor.load_state_dict(ckpt["model_state_dict"])
+            self.predictor.load_checkpoint(predictor_checkpoint)
             self.predictor.eval()
 
         # Dimensions
@@ -97,26 +105,16 @@ class AudioFXEnv:
         self,
         dry_audio: torch.Tensor,
         target_audio: torch.Tensor,
-        use_warm_start: bool = True,
+        use_warm_start: bool = False,
     ) -> tuple[torch.Tensor, dict[str, Any]]:
         """Reset environment with new dry and target audio pair."""
-        # Ensure correct shape: (1, 1, T)
-        dry = dry_audio.to(self.device)
-        target = target_audio.to(self.device)
-        if dry.ndim == 1:
-            dry = dry.unsqueeze(0).unsqueeze(0)
-        elif dry.ndim == 2:
-            dry = dry.unsqueeze(0)
-        if target.ndim == 1:
-            target = target.unsqueeze(0).unsqueeze(0)
-        elif target.ndim == 2:
-            target = target.unsqueeze(0)
-
-        # Crop to max duration
-        self.dry_audio = dry[..., :self.max_samples]
-        self.target_audio = target[..., :self.max_samples]
+        if use_warm_start and self.predictor is None:
+            raise ValueError("Warm-start requires a compatible predictor checkpoint")
+        self.dry_audio, self.target_audio = prepare_audio_pair(dry_audio, target_audio, device=self.device,
+            sample_rate=self.sample_rate, duration=self.audio_duration_sec)
+        self.current_audio = None
         self.current_step = 0
-
+        self._done = False
         # Initial baseline loss (dry vs target without any effects)
         with torch.no_grad():
             self.initial_loss = float(self.loss_fn(self.dry_audio, self.target_audio).item())
@@ -137,8 +135,11 @@ class AudioFXEnv:
         with torch.no_grad():
             self.current_loss = float(self.loss_fn(self.current_audio, self.target_audio).item())
 
+        self.start_loss = self.current_loss
+        self.predictor_loss = self.current_loss if use_warm_start else None
         obs = self._get_observation()
         info = {
+            "start_loss": self.start_loss, "predictor_loss": self.predictor_loss,
             "initial_loss": self.initial_loss,
             "current_loss": self.current_loss,
             "num_active_effects": int(self.current_presence.sum().item()),
@@ -146,7 +147,22 @@ class AudioFXEnv:
         }
         return obs, info
 
-    def step(
+    def step(self, action):
+        if self._done: raise RuntimeError("Episode finished; call reset")
+        action = torch.as_tensor(action, dtype=torch.float32, device=self.device)
+        if action.shape != (36,) or not torch.isfinite(action).all():
+            raise ValueError("Expected 36 finite action values")
+        saved = (self.current_presence.clone(), self.current_params.clone(), self.current_audio,
+                 self.current_loss, self.current_step)
+        try:
+            result = self._step(action)
+        except Exception:
+            self.current_presence,self.current_params,self.current_audio,self.current_loss,self.current_step=saved
+            raise
+        self._done = result[2] or result[3]
+        return result
+
+    def _step(
         self,
         action: torch.Tensor | list[float],
     ) -> tuple[torch.Tensor, float, bool, bool, dict[str, Any]]:
@@ -172,9 +188,9 @@ class AudioFXEnv:
         # Render audio through DAPN DSP
         self._render_current_sound()
 
-        # Compute new spectral distance loss
         with torch.no_grad():
-            new_loss = float(self.loss_fn(self.current_audio, self.target_audio).item())
+            new_loss = float(self.loss_fn(self.current_audio, self.target_audio))
+        if not math.isfinite(new_loss): raise RuntimeError("Nonfinite audio loss")
         self.current_loss = new_loss
 
         # Calculate Reward
@@ -189,19 +205,22 @@ class AudioFXEnv:
         target_bonus = 5.0 if new_loss <= self.target_threshold_loss else 0.0
 
         reward = spectral_gain - sparsity_penalty + target_bonus
+        if not math.isfinite(reward):
+            reward = -1.0
 
         # Check termination
         terminated = bool(new_loss <= self.target_threshold_loss)
-        truncated = bool(self.current_step >= self.max_steps)
+        truncated = bool(not terminated and self.current_step >= self.max_steps)
 
         obs = self._get_observation()
         info = {
+            "reward_breakdown": {"loss_improvement_reward": spectral_gain, "length_penalty": -sparsity_penalty, "terminal_bonus": target_bonus, "total_step_reward": reward},
             "step": self.current_step,
             "prev_loss": prev_loss,
             "current_loss": new_loss,
             "spectral_gain": spectral_gain,
             "num_active_effects": int(num_active),
-            "improvement_pct": max(0.0, (1.0 - new_loss / (self.initial_loss + 1e-8)) * 100.0),
+            "improvement_pct": (self.start_loss-new_loss) / max(self.start_loss, 1e-8) * 100.0,
         }
 
         return obs, reward, terminated, truncated, info
@@ -223,10 +242,9 @@ class AudioFXEnv:
 
         chain_dict = {"chain": chain_steps}
         with torch.no_grad():
-            if chain_steps:
-                self.current_audio = self.dapn.process(self.dry_audio, chain_dict)
-            else:
-                self.current_audio = self.dry_audio.clone()
+            rendered = self.dapn.process(self.dry_audio, chain_dict) if chain_steps else self.dry_audio.clone()
+            if not torch.isfinite(rendered).all(): raise RuntimeError("Nonfinite DAPN output")
+            self.current_audio = rendered
 
     def _get_observation(self) -> torch.Tensor:
         """Construct compact state representation for RL agent."""
@@ -246,6 +264,7 @@ class AudioFXEnv:
 
         # Concatenate acoustic embedding + current presence (7) + current params (29) = 100 dims
         obs = torch.cat([acoustic_feats, self.current_presence, self.current_params], dim=0)
+        obs = torch.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
         return obs
 
     def get_current_chain_summary(self) -> dict[str, Any]:

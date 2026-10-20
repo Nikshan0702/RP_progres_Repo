@@ -77,7 +77,7 @@ class Chorus(BaseEffect):
         # 2. Base delay and modulation depth in samples
         base_delay_samples = delay_ms * sr / 1000.0
         # Modulation swing up to 8 ms
-        max_mod_samples = 8.0 * sr / 1000.0
+        max_mod_samples = torch.minimum(base_delay_samples * 0.95, base_delay_samples.new_tensor(8.0 * sr / 1000.0))
 
         # 3. LFO time vector and continuous delay buffer
         t = torch.arange(T, dtype=audio_3d.dtype, device=audio_3d.device)

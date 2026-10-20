@@ -77,3 +77,45 @@ def test_combined_audio_loss_metrics(sample_audio_2d):
     assert "l1_loss" in metrics
     assert "total_loss" in metrics
     assert metrics["total_loss"] > metrics["mr_stft_loss"]
+
+
+def test_short_audio_handling():
+    """Signals shorter than window length (e.g., T=256 or T=1024) must not crash."""
+    criterion = MultiResolutionSTFTLoss()
+    for length in [128, 256, 512, 1024]:
+        short_audio = torch.randn(1, length)
+        # Identical
+        loss_ident = criterion(short_audio, short_audio)
+        assert torch.isfinite(loss_ident)
+        assert loss_ident.item() < 1e-4
+
+        # Different
+        diff_audio = torch.randn(1, length)
+        loss_diff = criterion(short_audio, diff_audio)
+        assert torch.isfinite(loss_diff)
+        assert loss_diff.item() > loss_ident.item()
+
+
+def test_short_audio_gradient_flow():
+    """Gradients propagate through short audio inputs."""
+    criterion = MultiResolutionSTFTLoss()
+    pred = torch.randn(1, 256, requires_grad=True)
+    target = torch.randn(1, 256)
+    loss = criterion(pred, target)
+    loss.backward()
+
+    assert pred.grad is not None
+    assert torch.isfinite(pred.grad).all()
+    assert pred.grad.abs().sum().item() > 0.0
+
+
+def test_loss_ordering_near_vs_distant(sample_audio_2d):
+    """Near identical audio has much lower loss than distant audio."""
+    criterion = MultiResolutionSTFTLoss()
+    slightly_perturbed = sample_audio_2d + 0.01 * torch.randn_like(sample_audio_2d)
+    very_different = torch.randn_like(sample_audio_2d) * 2.0
+
+    loss_close = criterion(sample_audio_2d, slightly_perturbed).item()
+    loss_far = criterion(sample_audio_2d, very_different).item()
+
+    assert loss_close < loss_far

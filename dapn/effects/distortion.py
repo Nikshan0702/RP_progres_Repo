@@ -80,7 +80,7 @@ class Distortion(BaseEffect):
         decay = torch.pow((1.0 - alpha).clamp(min=1e-4, max=0.999), n)
         kernel = alpha * decay
         kernel = kernel / (kernel.sum() + _EPS)  # Normalized FIR filter
-        kernel_3d = kernel.view(1, 1, -1)
+        kernel_3d = kernel.flip(0).view(1, 1, -1)
 
         # Causal grouped conv1d
         pad_len = _TONE_TAPS - 1

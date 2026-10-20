@@ -1,0 +1,35 @@
+{
+  "file_metadata": {
+    "file_name": "grrl_demo_output.wav",
+    "file_path": "/Users/nikshanps/Desktop/RP-PROJECT/RP-imp/RP2_A/audio/grrl_demo_output.wav",
+    "file_size_kb": 172.31,
+    "channels": 1,
+    "channel_layout": "Mono",
+    "sample_rate_hz": 44100,
+    "total_samples": 88200,
+    "duration_seconds": 2.0
+  },
+  "dynamics_and_levels": {
+    "peak_linear": 0.3403,
+    "peak_dbFS": -9.36,
+    "rms_linear": 0.05179,
+    "rms_dbFS": -25.71,
+    "crest_factor_db": 16.35,
+    "dc_offset": 8.1e-05,
+    "clipped_samples_count": 0,
+    "clipped_percentage": 0.0,
+    "active_audio_percentage": 77.81,
+    "zero_crossing_rate": 0.0751
+  },
+  "spectral_characteristics": {
+    "spectral_centroid_hz": 1200.9,
+    "spectral_bandwidth_hz": 1258.9,
+    "spectral_rolloff_85pct_hz": 2151.2,
+    "spectral_flatness": 0.01108,
+    "energy_distribution": {
+      "low_sub_bass_under_250hz_pct": 60.62,
+      "midrange_250_to_4000hz_pct": 31.21,
+      "high_presence_above_4000hz_pct": 8.17
+    }
+  }
+}

@@ -60,3 +60,43 @@ def test_end_to_end_wav_processing(dapn):
 def test_load_nonexistent_audio_raises():
     with pytest.raises(FileNotFoundError):
         load_audio("/tmp/definitely_not_a_real_audio_file_12345.wav")
+
+
+def test_resample_48k_to_44k():
+    """Verify 48 kHz audio is correctly resampled to target 44.1 kHz."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p48 = Path(tmpdir) / "tone_48k.wav"
+        tone = generate_test_tone(frequency_hz=440.0, duration_s=1.0, sample_rate=48000)
+        save_audio(tone, p48, sample_rate=48000)
+
+        loaded, sr = load_audio(p48, target_sample_rate=44100)
+        assert sr == 44100
+        assert abs(loaded.shape[1] - 44100) <= 2
+        assert torch.isfinite(loaded).all()
+
+
+def test_resample_44k_to_48k():
+    """Verify 44.1 kHz audio is correctly resampled to target 48 kHz."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p44 = Path(tmpdir) / "tone_44k.wav"
+        tone = generate_test_tone(frequency_hz=440.0, duration_s=0.5, sample_rate=44100)
+        save_audio(tone, p44, sample_rate=44100)
+
+        loaded, sr = load_audio(p44, target_sample_rate=48000)
+        assert sr == 48000
+        assert abs(loaded.shape[1] - 24000) <= 2
+        assert torch.isfinite(loaded).all()
+
+
+def test_resample_stereo_48k_to_mono_44k():
+    """Verify stereo 48 kHz audio is downmixed to mono and resampled to 44.1 kHz."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p_stereo = Path(tmpdir) / "stereo_48k.wav"
+        tone_stereo = generate_test_tone(frequency_hz=330.0, duration_s=0.5, channels=2, sample_rate=48000)
+        save_audio(tone_stereo, p_stereo, sample_rate=48000)
+
+        loaded, sr = load_audio(p_stereo, target_sample_rate=44100, target_channels=1)
+        assert sr == 44100
+        assert loaded.shape[0] == 1
+        assert abs(loaded.shape[1] - int(0.5 * 44100)) <= 2
+        assert torch.isfinite(loaded).all()
