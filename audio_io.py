@@ -4,8 +4,8 @@ audio_io.py
 Audio file I/O utilities — intentionally kept *outside* the
 differentiable DSP chain.
 
-Uses the Python standard library `wave` module and `struct` for WAV
-reading and writing. This avoids heavy external codec dependencies like
+Uses a small RIFF parser (integer PCM 8/16/24/32-bit, float 32/64-bit,
+WAVE_FORMAT_EXTENSIBLE) and the stdlib `wave` module for writing. This avoids heavy external codec dependencies like
 torchcodec / soundfile, while guaranteeing standard 16-bit or 32-bit float
 PCM WAV compatibility across all platforms.
 
@@ -29,6 +29,74 @@ import torch
 from common.config_loader import get_sample_rate, get_channels, get_max_duration_seconds
 
 logger = logging.getLogger(__name__)
+
+
+_WAVE_FORMAT_PCM, _WAVE_FORMAT_FLOAT, _WAVE_FORMAT_EXTENSIBLE = 1, 3, 0xFFFE
+
+
+def _decode_wav(path: Path) -> tuple[torch.Tensor, int]:
+    """Decode a RIFF/WAVE file using its *declared* encoding.
+
+    Supported: integer PCM 8/16/24/32-bit and IEEE float 32/64-bit
+    (including WAVE_FORMAT_EXTENSIBLE). Everything else raises ``ValueError``.
+    Returns ``(C, T)`` float32 and the file sample rate; checks finiteness.
+    """
+    import numpy as np
+
+    data = path.read_bytes()
+    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise ValueError(f"{path.name}: not a RIFF/WAVE file")
+    fmt = None
+    pcm = None
+    pos = 12
+    while pos + 8 <= len(data):
+        cid = data[pos:pos + 4]
+        size = struct.unpack("<I", data[pos + 4:pos + 8])[0]
+        body = data[pos + 8:pos + 8 + size]
+        if cid == b"fmt ":
+            fmt = body
+        elif cid == b"data":
+            pcm = body  # truncated final chunk tolerated (streamed writers)
+            break
+        pos += 8 + size + (size & 1)
+    if fmt is None or len(fmt) < 16 or pcm is None:
+        raise ValueError(f"{path.name}: missing fmt/data chunk")
+    tag, channels, sr, _, block_align, bits = struct.unpack("<HHIIHH", fmt[:16])
+    if tag == _WAVE_FORMAT_EXTENSIBLE:
+        if len(fmt) < 26:
+            raise ValueError(f"{path.name}: malformed WAVE_FORMAT_EXTENSIBLE header")
+        tag = struct.unpack("<H", fmt[24:26])[0]  # sub-format GUID starts with the real tag
+    if channels < 1 or sr < 1:
+        raise ValueError(f"{path.name}: invalid channel count/sample rate ({channels}, {sr})")
+    width = bits // 8
+    if bits % 8 or width < 1 or block_align != width * channels:
+        raise ValueError(f"{path.name}: inconsistent block alignment")
+    frames = len(pcm) // block_align
+    if frames == 0:
+        raise ValueError(f"{path.name}: contains no audio samples")
+    pcm = pcm[:frames * block_align]
+    if tag == _WAVE_FORMAT_PCM:
+        if width == 1:
+            x = (np.frombuffer(pcm, np.uint8).astype(np.float32) - 128.0) / 128.0
+        elif width == 2:
+            x = np.frombuffer(pcm, "<i2").astype(np.float32) / 32768.0
+        elif width == 3:
+            b = np.frombuffer(pcm, np.uint8).reshape(-1, 3).astype(np.int32)
+            v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)
+            x = np.where(v >= 1 << 23, v - (1 << 24), v).astype(np.float32) / 8388608.0
+        elif width == 4:
+            x = (np.frombuffer(pcm, "<i4").astype(np.float64) / 2147483648.0).astype(np.float32)
+        else:
+            raise ValueError(f"{path.name}: unsupported PCM width {bits}-bit")
+    elif tag == _WAVE_FORMAT_FLOAT:
+        if width not in (4, 8):
+            raise ValueError(f"{path.name}: unsupported float width {bits}-bit")
+        x = np.frombuffer(pcm, "<f4" if width == 4 else "<f8").astype(np.float32)
+    else:
+        raise ValueError(f"{path.name}: unsupported WAV format tag {tag}")
+    if not np.isfinite(x).all():
+        raise ValueError(f"{path.name}: contains non-finite samples")
+    return torch.from_numpy(np.ascontiguousarray(x.reshape(frames, channels).T)), int(sr)
 
 
 def load_audio(
@@ -63,34 +131,7 @@ def load_audio(
     if not path.exists():
         raise FileNotFoundError(f"Audio file not found: {path}")
 
-    with wave.open(str(path), "rb") as wf:
-        n_channels = wf.getnchannels()
-        sampwidth  = wf.getsampwidth()
-        sr         = wf.getframerate()
-        n_frames   = wf.getnframes()
-        raw_bytes  = wf.readframes(n_frames)
-
-    # Decode bytes to float32
-    if sampwidth == 2:  # 16-bit signed PCM
-        total_samples = n_frames * n_channels
-        fmt = f"<{total_samples}h"
-        integers = struct.unpack(fmt, raw_bytes)
-        waveform = torch.tensor(integers, dtype=torch.float32) / 32768.0
-    elif sampwidth == 4:  # 32-bit float or 32-bit int PCM
-        total_samples = n_frames * n_channels
-        try:
-            fmt = f"<{total_samples}f"
-            floats = struct.unpack(fmt, raw_bytes)
-            waveform = torch.tensor(floats, dtype=torch.float32)
-        except Exception:
-            fmt = f"<{total_samples}i"
-            integers = struct.unpack(fmt, raw_bytes)
-            waveform = torch.tensor(integers, dtype=torch.float32) / 2147483648.0
-    else:
-        raise ValueError(f"Unsupported WAV sample width: {sampwidth * 8}-bit")
-
-    # Reshape to (C, T)
-    waveform = waveform.view(n_frames, n_channels).t()
+    waveform, sr = _decode_wav(path)  # (C, T) float32 in native layout
 
     target_sr = target_sample_rate or get_sample_rate()
     target_ch = target_channels    or get_channels()
@@ -146,6 +187,8 @@ def save_audio(
             f"Expected (C, T) or (B, C, T) tensor, got {tuple(audio.shape)}"
         )
 
+    if not torch.isfinite(waveform).all():
+        raise ValueError("Refusing to save non-finite audio")
     # Clamp to [-1, 1]
     waveform = waveform.clamp(-1.0, 1.0)
     n_channels, n_frames = waveform.shape

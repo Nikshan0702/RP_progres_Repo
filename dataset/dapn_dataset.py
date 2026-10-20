@@ -99,8 +99,16 @@ class DAPNSyntheticDataset(Dataset):
                         param_vector[start_idx + i] = float(norm_dict[p_name])
                         param_mask[start_idx + i] = 1.0
 
+        # 3. Ordered sequence labels (effects..., STOP, PAD=-100) for the order decoder
+        seq = list(item["chain_sequence"])
+        if seq != [e["effect"] for e in item.get("effects", [])]:
+            raise ValueError(f"{item['sample_id']}: chain_sequence disagrees with effects order")
+        toks = [SUPPORTED_EFFECTS.index(n) for n in seq] + [len(SUPPORTED_EFFECTS)]
+        toks += [-100] * (len(SUPPORTED_EFFECTS) + 1 - len(toks))
+
         return {
             "sample_id": item["sample_id"],
+            "order_tokens": torch.tensor(toks, dtype=torch.long),
             "dry_audio": dry_audio,
             "wet_audio": wet_audio,
             "presence_multihot": presence,
@@ -118,6 +126,7 @@ def dapn_collate_fn(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "dry_audio": torch.stack([item["dry_audio"] for item in batch]),
         "wet_audio": torch.stack([item["wet_audio"] for item in batch]),
         "presence_multihot": torch.stack([item["presence_multihot"] for item in batch]),
+        "order_tokens": torch.stack([item["order_tokens"] for item in batch]),
         "param_targets": torch.stack([item["param_targets"] for item in batch]),
         "param_mask": torch.stack([item["param_mask"] for item in batch]),
         "chain_sequence": [item["chain_sequence"] for item in batch],

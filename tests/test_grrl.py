@@ -103,7 +103,7 @@ def test_discrete_action_selection(grrl_agent, grrl_env, synthetic_audio):
 
 def test_continuous_parameter_bounds(grrl_agent):
     """Test that continuous heads output values strictly in [0.0, 1.0] for every effect."""
-    dummy_obs = torch.randn(148)
+    dummy_obs = torch.randn(188)
 
     for eff_idx, eff_name in enumerate(SUPPORTED_EFFECTS):
         # Force discrete selection of eff_idx
@@ -259,8 +259,8 @@ def test_min_chain_length_masks_stop(grrl_env, synthetic_audio):
 def test_hybrid_log_probabilities(grrl_agent):
     """Test that joint log-probabilities of hybrid actions are computed correctly."""
     batch_size = 4
-    dummy_obs = torch.randn(batch_size, 148)
-    dummy_masks = torch.ones(batch_size, 8, dtype=torch.bool)
+    dummy_obs = torch.randn(batch_size, 188)
+    dummy_masks = torch.ones(batch_size, 9, dtype=torch.bool)
     discrete_actions = torch.tensor([0, 1, 4, 7])  # EQ, Compressor, Distortion, STOP
     continuous_actions = torch.rand(batch_size, 5)
 
@@ -282,12 +282,12 @@ def test_hybrid_log_probabilities(grrl_agent):
 
 def test_gae_computation():
     """Test Generalized Advantage Estimation (GAE) with terminal-state bootstrap."""
-    buffer = GRRLRolloutBuffer(buffer_size=5, obs_dim=148, num_actions=8, max_params_per_effect=5)
+    buffer = GRRLRolloutBuffer(buffer_size=5, obs_dim=188, num_actions=9, max_params_per_effect=5)
 
     for t in range(5):
         buffer.add(
-            obs=torch.randn(148),
-            action_mask=torch.ones(8, dtype=torch.bool),
+            obs=torch.randn(188),
+            action_mask=torch.ones(9, dtype=torch.bool),
             discrete_action=t,
             continuous_action=torch.full((5,), 0.5),
             reward=1.0,
@@ -336,7 +336,7 @@ def test_checkpoint_save_and_reload(grrl_agent):
         assert ckpt_path.exists()
 
         # Create new agent and reload
-        new_agent = GRRLAgent(obs_dim=grrl_agent.actor_critic.obs_dim, num_actions=8)
+        new_agent = GRRLAgent(obs_dim=grrl_agent.actor_critic.obs_dim, num_actions=9)
         new_agent.load(ckpt_path)
 
         # Check weights equality
@@ -348,19 +348,27 @@ def test_checkpoint_save_and_reload(grrl_agent):
 # 13. M2 Warm-Start Compatibility
 # ---------------------------------------------------------------------------
 
-def test_m2_warm_start_compatibility(synthetic_audio):
-    """Test GRRLEnv handles use_warm_start safely even if checkpoint not present or present."""
+def test_m2_warm_start_compatibility(synthetic_audio, v2_predictor_ckpt):
+    """Warm start renders the predictor's exact chain; predictor_loss is that chain's loss (not dry)."""
     dry, target = synthetic_audio
-    ckpt_path = Path("checkpoints/best_model.pth")
-    env = GRRLEnv(
-        predictor_checkpoint=ckpt_path if ckpt_path.exists() else None,
-        max_chain_length=4,
-    )
+    env = GRRLEnv(predictor_checkpoint=v2_predictor_ckpt, max_chain_length=4)
     obs, info = env.reset(dry, target, use_warm_start=True)
 
-    assert obs.shape == (148,)
-    assert isinstance(info["warm_started"], bool)
-    assert len(env.current_chain) <= 4
+    assert obs.shape == (188,)
+    assert info["warm_started"] is True
+    assert 1 <= len(env.current_chain) <= 4
+    assert info["predictor_loss"] == info["start_loss"] == env.current_loss
+    # independent re-render of the reported chain reproduces the reported loss
+    re = env.dapn.process(env.dry_audio, {"chain": env.current_chain})
+    assert abs(float(env.loss_fn(re, env.target_audio)) - info["predictor_loss"]) < 1e-6
+    assert info["dry_loss"] == info["initial_loss"]
+
+
+def test_warm_start_without_predictor_fails_loudly(synthetic_audio):
+    dry, target = synthetic_audio
+    env = GRRLEnv(predictor_checkpoint=None, max_chain_length=4)
+    with pytest.raises(ValueError, match="Warm-start requires"):
+        env.reset(dry, target, use_warm_start=True)
 
 
 # ---------------------------------------------------------------------------

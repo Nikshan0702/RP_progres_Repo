@@ -6,9 +6,9 @@ Graph-Generating Reinforcement Learning Agent (GRRL-Agent).
 
 Features:
 - Hybrid action space:
-    1. Masked Categorical distribution over 8 discrete actions:
-       {EQ, Compressor, Delay, Reverb, Distortion, Chorus, Flanger, STOP}.
-    2. Per-effect Beta continuous parameter heads generating normalized
+    1. Masked Categorical distribution over 9 discrete actions:
+       {7 effects, STOP, BACKTRACK}.
+    2. Per-effect Beta continuous parameter heads (shape params >= 1) generating normalized
        knob values strictly bounded in [0, 1].
 - Exact joint log-probability P(effect, params | state).
 - State-value function baseline V(s).
@@ -26,22 +26,49 @@ import torch.nn as nn
 from torch.distributions import Categorical, Beta
 
 from dataset.dapn_dataset import PARAM_SCHEMA, SUPPORTED_EFFECTS
+from common.checkpoint import load_checkpoint, restore_rng_state, save_checkpoint
 from rl.grrl_buffer import GRRLRolloutBuffer
 from rl.grrl_env import EFFECT_ACTIONS, MAX_PARAMS_PER_EFFECT, NUM_EFFECT_ACTIONS, STOP_ACTION_IDX
 
 logger = logging.getLogger(__name__)
 
 
-def bounded_parameters(mean, log_scale):
-    """Beta policy on (0,1), with exact density and analytic entropy.
+_ACTION_EPS = 1e-6
+DISTRIBUTION_NAME = "beta_v2"
 
-    Retains per-effect mean heads and scale parameters. Scale now controls
-    concentration, k=2+exp(-2 log_scale); old Gaussian checkpoints are incompatible.
-    Positive floors avoid degenerate shape parameters, without clipping actions.
-    The physical action is an affine mapping performed by DAPN's parameter mapper.
+
+def clamp_actions(x: torch.Tensor) -> torch.Tensor:
+    """Keep stored/evaluated actions strictly inside (0, 1).
+
+    Beta samples can round to exactly 0 or 1 in float32, where log-density is
+    -inf/NaN. With shape parameters >= 1 the probability mass within 1e-6 of a
+    boundary is <= ~1e-6, so the stored action and its log-probability describe
+    the same distribution up to a negligible, documented perturbation. The
+    SAME clamped value is what is stored, evaluated and sent to the environment.
     """
-    k = 2.0 + torch.exp(-2 * log_scale.clamp(-3., 2.))
-    return Beta(.05 + mean * k, .05 + (1 - mean) * k)
+    return x.clamp(_ACTION_EPS, 1.0 - _ACTION_EPS)
+
+
+def bounded_parameters(mean, log_scale):
+    """Beta policy on (0, 1): exact sampling, exact density, analytic entropy.
+
+    alpha = 1 + m*k, beta = 1 + (1-m)*k with concentration k = exp(-2*log_scale)
+    (log_scale clamped to [-3, 2]). Shape parameters >= 1 guarantee a density that
+    is finite at the boundaries and unimodal, so no clipping is ever needed and the
+    sampled value *is* the action. The distribution mean is (1+m*k)/(2+k) (equal to
+    m only as k -> inf); deterministic evaluation uses the mode
+    (alpha-1)/(alpha+beta-2) = m exactly. Entropy is the Beta differential entropy
+    (nats, <= 0 for a distribution on a unit interval). The physical value is an
+    affine map of the action performed by DAPN's ParameterMapper.
+    Old Gaussian/clipped checkpoints are incompatible (see common.checkpoint).
+    """
+    k = torch.exp(-2 * log_scale.clamp(-3., 2.))
+    return Beta(1.0 + mean * k, 1.0 + (1.0 - mean) * k)
+
+
+def deterministic_action(mean: torch.Tensor) -> torch.Tensor:
+    """Mode of :func:`bounded_parameters` (== sigmoid head output)."""
+    return clamp_actions(mean)
 
 
 class GRRLActorCritic(nn.Module):
@@ -50,7 +77,7 @@ class GRRLActorCritic(nn.Module):
     Parameters
     ----------
     obs_dim : int
-        Observation vector dimensionality (default: 148).
+        Observation vector dimensionality (default: 188).
     num_actions : int
         Number of discrete actions (default: 8).
     hidden_dim : int
@@ -168,9 +195,9 @@ class GRRLActorCritic(nn.Module):
             dist_cont = bounded_parameters(param_mean, log_std)
 
             if deterministic:
-                sample_p = dist_cont.mean
+                sample_p = deterministic_action(param_mean)
             else:
-                sample_p = dist_cont.sample()
+                sample_p = clamp_actions(dist_cont.sample())
 
             log_prob_cont = dist_cont.log_prob(sample_p).sum()
             cont_act[:len(sample_p)] = sample_p
@@ -234,7 +261,7 @@ class GRRLActorCritic(nn.Module):
                 
                 dist_sub = bounded_parameters(param_mean, self.param_log_stds[eff_name])
 
-                sub_actions = continuous_actions[mask_eff, :k_params]
+                sub_actions = clamp_actions(continuous_actions[mask_eff, :k_params])
                 # Log prob of continuous parameters
                 lp_sub = dist_sub.log_prob(sub_actions).sum(dim=-1)
                 ent_sub = dist_sub.entropy().sum(dim=-1)
@@ -254,7 +281,7 @@ class GRRLAgent:
     Parameters
     ----------
     obs_dim : int
-        Observation space dimension (default: 148).
+        Observation space dimension (default: 188).
     num_actions : int
         Discrete action space dimension (default: 8).
     lr : float
@@ -321,6 +348,12 @@ class GRRLAgent:
                 obs.to(self.device), action_mask=mask, deterministic=deterministic
             )
         return disc_act, cont_act, log_prob, value
+
+    def value(self, obs: torch.Tensor) -> float:
+        """State value V(obs) without sampling (consumes no RNG) and without touching train/eval mode."""
+        with torch.no_grad():
+            f = self.actor_critic.forward_features(obs.to(self.device).reshape(1, -1))
+            return float(self.actor_critic.value_head(f).item())
 
     def train_step(
         self,
@@ -418,26 +451,38 @@ class GRRLAgent:
             "clip_fraction": clip_fraction_accum / n_batches,
         }
 
-    def save(self, path: str | Path) -> None:
-        """Save model checkpoint."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "actor_critic_state_dict": self.actor_critic.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-            },
-            str(path),
-        )
+    def config(self) -> dict:
+        ac = self.actor_critic
+        return {"obs_dim": ac.obs_dim, "num_actions": ac.num_actions, "hidden_dim": ac.hidden_dim,
+                "distribution": DISTRIBUTION_NAME, "action_eps": _ACTION_EPS,
+                "effects": list(SUPPORTED_EFFECTS),
+                "clip_eps": self.clip_eps, "value_coef": self.value_coef,
+                "entropy_coef": self.entropy_coef, "max_grad_norm": self.max_grad_norm}
+
+    def save(self, path: str | Path, *, progress: dict | None = None, selection: dict | None = None,
+             provenance: dict | None = None, extra_config: dict | None = None,
+             include_optimizer: bool = True) -> None:
+        """Save a schema-v2 checkpoint (weights, optimizer, RNG, config, progress, selection)."""
+        save_checkpoint(
+            path, kind="grrl", config={**self.config(), **(extra_config or {})},
+            model_state=self.actor_critic.state_dict(),
+            optimizer_state=self.optimizer.state_dict() if include_optimizer else None,
+            progress=progress, selection=selection, provenance=provenance)
         logger.info("Saved GRRL checkpoint to %s", path)
 
-    def load(self, path: str | Path) -> None:
-        """Load model checkpoint."""
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"GRRL Checkpoint not found: {path}")
-        ckpt = torch.load(str(path), map_location=self.device)
-        self.actor_critic.load_state_dict(ckpt["actor_critic_state_dict"])
-        if "optimizer_state_dict" in ckpt:
-            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-        logger.info("Loaded GRRL checkpoint from %s", path)
+    def load(self, path: str | Path, mode: str = "eval") -> dict:
+        """Load weights (``mode='eval'``) or weights+optimizer+RNG (``mode='resume'``).
+
+        Raises FileNotFoundError for a missing file and IncompatibleCheckpointError
+        for legacy files or architecture/distribution mismatches. Returns the checkpoint
+        dict (progress/selection/provenance) so callers can continue counters.
+        """
+        cfg = self.config()
+        ckpt = load_checkpoint(path, kind="grrl", mode=mode, map_location=self.device,
+                               expected_config={k: cfg[k] for k in ("obs_dim", "num_actions", "hidden_dim", "distribution")})
+        self.actor_critic.load_state_dict(ckpt["model_state"])
+        if mode == "resume":
+            self.optimizer.load_state_dict(ckpt["optimizer_state"])
+            restore_rng_state(ckpt["rng_state"])
+        logger.info("Loaded GRRL checkpoint from %s (%s)", path, mode)
+        return ckpt

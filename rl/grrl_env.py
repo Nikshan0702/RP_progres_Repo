@@ -4,7 +4,22 @@ BACKTRACK makes every warm-start prefix revisable: pop to the desired position,
 then append new effects/parameters in a different order. It is an explicit policy
 action, never an automatic search or optimizer. STOP alone finalizes a valid chain;
 the operation budget is a time-limit truncation. Invalid actions raise ValueError
-without mutation; DSP errors raise RuntimeError without committing the candidate.
+without mutation. DSP/render failures never fall back to dry or stale audio; the candidate is
+never committed and, per ``failure_mode``:
+  'raise'   (default) -> RuntimeError;
+  'penalty'           -> the step consumes budget, returns reward ``-failure_penalty``,
+                         terminated=False, truncated iff the budget is exhausted, and
+                         info['render_failed']=True with info['error'] (state unchanged, so the
+                         reported chain is always the chain that produced current_audio).
+
+Reward (per step, every component's sign; lower reconstruction loss is better):
+  loss_improvement_reward = +10*(prev_loss - new_loss)     (+ when loss drops)
+  step_penalty            = -step_penalty                  (0 for STOP)
+  length_penalty          = -length_penalty*(len_after - len_before)   (+ for BACKTRACK)
+  terminal_bonus          = +3 when target loss reached AND the episode started above target
+  total_step_reward       = exact sum of the four components (asserted in tests).
+Audio reconstruction loss = multi-resolution STFT distance (common.losses); it is not the
+reward, not the PPO loss, and not the predictor's supervised loss.
 """
 import copy
 import math
@@ -34,7 +49,9 @@ class GRRLEnv:
     def __init__(self,predictor_checkpoint=None,device='cpu',max_chain_length=None,
                  min_chain_length=None,allow_repeated_effects=None,step_penalty=.05,
                  target_threshold_loss=.40,sample_rate=None,audio_duration_sec=2.,
-                 pta_taste_dim=16,max_episode_steps=24,length_penalty=.02):
+                 pta_taste_dim=16,max_episode_steps=24,length_penalty=.02,failure_mode='raise',failure_penalty=1.):
+        if failure_mode not in ('raise','penalty'):raise ValueError("failure_mode must be 'raise' or 'penalty'")
+        self.failure_mode=failure_mode;self.failure_penalty=float(failure_penalty)
         self.device=torch.device(device)
         cfg=dict(load_system_config()['chain'])
         for name,value in [('max_chain_length',max_chain_length),('min_chain_length',min_chain_length),('allow_repeated_effects',allow_repeated_effects)]:
@@ -118,7 +135,9 @@ class GRRLEnv:
                     if not torch.isfinite(rendered).all():raise ValueError('Nonfinite DAPN output')
                     new_loss=float(self.loss_fn(rendered,self.target_audio))
                     if not math.isfinite(new_loss):raise ValueError('Nonfinite audio loss')
-                except Exception as exc:raise RuntimeError(f'DAPN candidate rejected: {exc}') from exc
+                except Exception as exc:
+                    if self.failure_mode=='raise':raise RuntimeError(f'DAPN candidate rejected: {exc}') from exc
+                    return self._failed_step(idx,prev,exc)
         self.current_step+=1;self.current_chain=candidate;self.current_audio=rendered;self.current_loss=new_loss
         target=new_loss<=self.target_threshold_loss and len(candidate)>=self.min_chain_length
         terminated=idx==7 or target
@@ -133,8 +152,23 @@ class GRRLEnv:
                   current_loss=new_loss,delta_loss=prev-new_loss,reward=reward,reward_breakdown={**components,'total_step_reward':reward},
                   improvement_pct=improvement_percent(self.start_loss,new_loss),dry_improvement_pct=improvement_percent(self.initial_loss,new_loss),
                   start_loss=self.start_loss,predictor_loss=self.predictor_loss,target_achieved=target,action_mask=self.get_action_mask(),
-                  terminated=terminated,truncated=truncated)
+                  terminated=terminated,truncated=truncated,render_failed=False)
         return self._get_observation(),reward,terminated,truncated,info
+
+    def _failed_step(self,idx,prev,exc):
+        # Nothing is committed: chain, audio and loss stay exactly as before the attempt.
+        self.current_step+=1
+        truncated=self.current_step>=self.max_episode_steps
+        self._done=truncated
+        reward=-self.failure_penalty
+        info=dict(action=EFFECT_ACTIONS[idx],step=self.current_step,chain_length=len(self.current_chain),prev_loss=prev,
+                  current_loss=prev,delta_loss=0.,reward=reward,render_failed=True,error=str(exc),
+                  reward_breakdown=dict(loss_improvement_reward=0.,step_penalty=0.,length_penalty=0.,terminal_bonus=0.,
+                                        failure_penalty=reward,total_step_reward=reward),
+                  improvement_pct=improvement_percent(self.start_loss,prev),dry_improvement_pct=improvement_percent(self.initial_loss,prev),
+                  start_loss=self.start_loss,predictor_loss=self.predictor_loss,target_achieved=False,action_mask=self.get_action_mask(),
+                  terminated=False,truncated=truncated)
+        return self._get_observation(),reward,False,truncated,info
 
     def _get_observation(self):
         with torch.no_grad():

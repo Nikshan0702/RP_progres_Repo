@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Bernoulli, Normal
 
+from common.checkpoint import load_checkpoint, restore_rng_state, save_checkpoint
 from rl.rollout_buffer import RolloutBuffer
 
 logger = logging.getLogger(__name__)
@@ -341,26 +342,36 @@ class PPOAgent:
             "clip_fraction": clip_fraction_accum / n_batches,
         }
 
-    def save(self, path: str | Path) -> None:
-        """Save model checkpoint."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "actor_critic_state_dict": self.actor_critic.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-            },
-            str(path),
-        )
+    def value(self, obs: torch.Tensor) -> float:
+        """V(obs) without sampling (no RNG use) and without changing train/eval mode."""
+        with torch.no_grad():
+            return float(self.actor_critic.value_head(self.actor_critic.shared_trunk(obs.to(self.device).reshape(1, -1))).item())
+
+    def config(self) -> dict:
+        ac = self.actor_critic
+        return {"obs_dim": ac.obs_dim, "discrete_dim": ac.discrete_dim, "continuous_dim": ac.continuous_dim,
+                "hidden_dim": ac.shared_trunk[0].out_features,
+                "distribution": "bernoulli_presence+gaussian_delta(unbounded action; env clamps knobs, not actions)",
+                "clip_eps": self.clip_eps, "value_coef": self.value_coef, "entropy_coef": self.entropy_coef,
+                "max_grad_norm": self.max_grad_norm}
+
+    def save(self, path: str | Path, *, progress: dict | None = None, selection: dict | None = None,
+             provenance: dict | None = None, extra_config: dict | None = None, include_optimizer: bool = True) -> None:
+        """Save a schema-v2 checkpoint (weights, optimizer, RNG, config, progress, selection)."""
+        save_checkpoint(path, kind="ppo_fixed_slot", config={**self.config(), **(extra_config or {})},
+                        model_state=self.actor_critic.state_dict(),
+                        optimizer_state=self.optimizer.state_dict() if include_optimizer else None,
+                        progress=progress, selection=selection, provenance=provenance)
         logger.info("Saved PPO checkpoint to %s", path)
 
-    def load(self, path: str | Path) -> None:
-        """Load model checkpoint."""
-        path = Path(path)
-        if not path.exists():
-            raise FileNotFoundError(f"PPO Checkpoint not found: {path}")
-        ckpt = torch.load(str(path), map_location=self.device)
-        self.actor_critic.load_state_dict(ckpt["actor_critic_state_dict"])
-        if "optimizer_state_dict" in ckpt:
-            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-        logger.info("Loaded PPO checkpoint from %s", path)
+    def load(self, path: str | Path, mode: str = "eval") -> dict:
+        """Load weights (eval) or weights+optimizer+RNG (resume); legacy files raise IncompatibleCheckpointError."""
+        cfg = self.config()
+        ckpt = load_checkpoint(path, kind="ppo_fixed_slot", mode=mode, map_location=self.device,
+                               expected_config={k: cfg[k] for k in ("obs_dim", "discrete_dim", "continuous_dim", "hidden_dim", "distribution")})
+        self.actor_critic.load_state_dict(ckpt["model_state"])
+        if mode == "resume":
+            self.optimizer.load_state_dict(ckpt["optimizer_state"])
+            restore_rng_state(ckpt["rng_state"])
+        logger.info("Loaded PPO checkpoint from %s (%s)", path, mode)
+        return ckpt

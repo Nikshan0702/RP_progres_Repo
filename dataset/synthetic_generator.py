@@ -94,6 +94,9 @@ def load_audio_slice(wav_path: Path, offset_seconds: float, duration_seconds: fl
 
             # Downmix to mono: shape (1, T)
             mono = samples.mean(dim=0, keepdim=True)
+            if sr != target_sr:
+                import torchaudio
+                mono = torchaudio.functional.resample(mono, orig_freq=sr, new_freq=target_sr)
             return mono
     except Exception:
         return None

@@ -45,21 +45,26 @@ def test_env_reset(dummy_audio):
     assert env.current_step == 0
 
 
-def test_env_reset_warm_start(dummy_audio):
-    """Test reset with trained model checkpoint warm-start."""
+def test_env_reset_warm_start(dummy_audio, v2_predictor_ckpt):
+    """Fixed-slot baseline warm start from a schema-v2 predictor checkpoint."""
     dry, target = dummy_audio
-    ckpt_path = Path("checkpoints/best_model.pth")
-    if not ckpt_path.exists():
-        pytest.skip("Checkpoint not found for warm-start test")
-
-    env = AudioFXEnv(predictor_checkpoint=ckpt_path)
+    env = AudioFXEnv(predictor_checkpoint=v2_predictor_ckpt)
     obs, info = env.reset(dry, target, use_warm_start=True)
 
     assert obs.shape == (100,)
     assert info["warm_started"] is True
-    # The predictor should have initialized candidate presence/params
+    assert info["predictor_loss"] == info["start_loss"]  # baseline is the predicted chain, not dry
     assert env.current_presence.shape == (7,)
     assert env.current_params.shape == (29,)
+
+
+def test_env_rejects_legacy_predictor_checkpoint():
+    from common.checkpoint import IncompatibleCheckpointError
+    legacy = Path("checkpoints/best_model.pth")
+    if not legacy.exists():
+        pytest.skip("legacy checkpoint not present")
+    with pytest.raises(IncompatibleCheckpointError):
+        AudioFXEnv(predictor_checkpoint=legacy)
 
 
 def test_env_step(dummy_audio):

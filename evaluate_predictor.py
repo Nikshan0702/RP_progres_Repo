@@ -55,12 +55,10 @@ def main():
     print(" DAPN Inverse FX Predictor: Closed-Loop Evaluation")
     print("=" * 68)
     print(f"Loading checkpoint: {ckpt_path}")
-    checkpoint = torch.load(ckpt_path, map_location=device)
-
     model = InverseFXNet().to(device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    checkpoint = model.load_checkpoint(ckpt_path)  # raises IncompatibleCheckpointError for legacy files
     model.eval()
-    print(f"Model loaded successfully (Trained at epoch {checkpoint.get('epoch', '?')}, Val Acc: {checkpoint.get('val_accuracy', 0.0):.1f}%)\n")
+    print(f"Model loaded (epoch {checkpoint['progress'].get('epoch', '?')}, selection={checkpoint['selection']})\n")
 
     # Load test audio
     if args.dry and args.wet:
@@ -98,8 +96,8 @@ def main():
     # -------------------------------------------------------------
     # Step 1: Predict Chain using Neural Network
     # -------------------------------------------------------------
-    print(f"[1] Running Neural Network Inference (Threshold: {args.threshold})...")
-    pred_chain = model.predict_chain(dry_audio, target_wet, threshold=args.threshold)
+    print("[1] Running Neural Network Inference (learned order decoder)...")
+    pred_chain = model.predict_chain(dry_audio, target_wet)
 
     print("    Predicted Chain Structure:")
     for step in pred_chain["chain"]:
@@ -123,12 +121,12 @@ def main():
         mse_dist = float(torch.nn.functional.mse_loss(reconstructed_audio, target_wet).item())
         dry_target_dist = float(loss_fn(dry_audio, target_wet).item())
 
-    # Calculate improvement over doing nothing (dry audio baseline)
-    improvement = max(0.0, (1.0 - mr_stft_dist / (dry_target_dist + 1e-8)) * 100.0)
+    # Signed improvement over the dry baseline (negative = the predicted chain is WORSE than doing nothing)
+    improvement = (1.0 - mr_stft_dist / (dry_target_dist + 1e-8)) * 100.0
 
     print("-" * 68)
     print(f"  Dry vs Target Initial Distance : {dry_target_dist:.5f}")
-    print(f"  Reconstructed vs Target MR-STFT: {mr_stft_dist:.5f} (Improved by {improvement:.1f}%)")
+    print(f"  Reconstructed vs Target MR-STFT: {mr_stft_dist:.5f} (change vs dry: {improvement:+.1f}%, lower loss is better)")
     print(f"  Waveform MSE                   : {mse_dist:.6f}")
     print("-" * 68)
 

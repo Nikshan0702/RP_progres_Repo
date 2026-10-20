@@ -96,15 +96,20 @@ def main():
     wet_in = wet_audio[..., :max_len].unsqueeze(0)
 
     # Load model
-    checkpoint = torch.load(ckpt_path, map_location="cpu")
     model = InverseFXNet()
-    model.load_state_dict(checkpoint["model_state_dict"])
+    try:
+        model.load_checkpoint(ckpt_path)  # strict: legacy checkpoints have no order decoder
+    except Exception as exc:
+        print(f"Error: {exc}")
+        sys.exit(2)
     model.eval()
 
     with torch.no_grad():
-        logits, pred_params = model(dry_in, wet_in)
-        probs = torch.sigmoid(logits)[0]
-        params = pred_params[0]
+        emb = model.encode(dry_in, wet_in)
+        probs = torch.sigmoid(model.presence_head(emb))[0]
+        params = model.param_head(emb)[0]
+        decoded, dec_probs = model.decode_order(emb, min_length=1, max_length=len(SUPPORTED_EFFECTS))
+    decoded_names = [SUPPORTED_EFFECTS[t] for t in decoded[0]]
 
     mappers = get_physical_mappers()
 
@@ -165,17 +170,19 @@ def main():
     print(f"  {'Effect':<14} | {'Confidence':<12} | {'Decision':<14}")
     print("  " + "-" * 46)
 
+    # The chain (membership AND order) comes from the learned sequence decoder; the presence
+    # head is an auxiliary classifier shown for reference (threshold only affects this table).
     active_effects = []
     for e_idx, effect_name in enumerate(SUPPORTED_EFFECTS):
         p = probs[e_idx].item()
-        if p >= args.threshold:
-            status = "★ ACTIVE"
+        in_chain = effect_name in decoded_names
+        if in_chain:
             active_effects.append((effect_name, p))
-        else:
-            status = "  bypassed"
-        print(f"  {effect_name:<14} | {p * 100:>8.2f}%    | {status}")
+        status = "★ IN DECODED CHAIN" if in_chain else "  not in chain"
+        print(f"  {effect_name:<14} | {p * 100:>8.2f}%    | {status}  (presence head {'on' if p >= args.threshold else 'off'})")
+    active_effects.sort(key=lambda e: decoded_names.index(e[0]))  # decoder order, NOT confidence order
 
-    print("\n[2] PREDICTED AUDIO CHAIN SEQUENCE:")
+    print("\n[2] PREDICTED AUDIO CHAIN SEQUENCE (learned order decoder):")
     if active_effects:
         chain_str = " -> ".join([eff[0] for eff in active_effects])
         print(f"  Audio Chain: [ {chain_str} ]")
